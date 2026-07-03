@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.tanuki.core.domain.util.onFailure
 import dev.tanuki.core.domain.util.onSuccess
 import dev.tanuki.core.presentation.UiText
+import dev.tanuki.feature.projects.domain.ProjectFilter
 import dev.tanuki.feature.projects.domain.ProjectRepository
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,17 +34,29 @@ class ProjectsViewModel(
             is ProjectsAction.OnOpen -> viewModelScope.launch {
                 _events.send(ProjectsEvent.OpenInBrowser(action.project.webUrl))
             }
+            is ProjectsAction.OnFilterChange -> {
+                if (action.filter != _state.value.filter) {
+                    _state.update { it.copy(filter = action.filter) }
+                    load()
+                }
+            }
+            is ProjectsAction.OnQueryChange -> _state.update { it.copy(query = action.query) }
         }
     }
 
     private fun load() {
+        val filter = _state.value.filter
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
-            repository.getMyProjects()
+            repository.getProjects(filter)
                 .onSuccess { list -> _state.update { it.copy(isLoading = false, projects = list) } }
                 .onFailure {
                     _state.update {
-                        it.copy(isLoading = false, error = UiText.Dynamic("Couldn't load projects."))
+                        it.copy(
+                            isLoading = false,
+                            projects = emptyList(),
+                            error = UiText.Dynamic("Couldn't load projects."),
+                        )
                     }
                 }
         }

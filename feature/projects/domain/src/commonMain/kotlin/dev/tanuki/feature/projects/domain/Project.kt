@@ -8,4 +8,9 @@ data class Project(
     val starCount: Int,
     val lastActivity: String?,
     val webUrl: String,
+    val visibility: Visibility,
+    /** "user" or "group" — used to tell personal from shared projects. */
+    val namespaceKind: String,
 )
+
+enum class Visibility { PUBLIC, INTERNAL, PRIVATE, UNKNOWN }

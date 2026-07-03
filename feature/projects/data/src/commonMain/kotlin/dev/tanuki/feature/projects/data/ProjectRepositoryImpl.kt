@@ -7,6 +7,7 @@ import dev.tanuki.core.domain.util.map
 import dev.tanuki.feature.projects.data.dto.ProjectDto
 import dev.tanuki.feature.projects.data.dto.toProject
 import dev.tanuki.feature.projects.domain.Project
+import dev.tanuki.feature.projects.domain.ProjectFilter
 import dev.tanuki.feature.projects.domain.ProjectRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
@@ -16,13 +17,20 @@ class ProjectRepositoryImpl(
     private val httpClient: HttpClient,
 ) : ProjectRepository {
 
-    override suspend fun getMyProjects(): Result<List<Project>, DataError.Remote> =
+    override suspend fun getProjects(filter: ProjectFilter): Result<List<Project>, DataError.Remote> =
         safeCall<List<ProjectDto>> {
             httpClient.get("projects") {
-                parameter("membership", true)
-                parameter("simple", true)
+                when (filter) {
+                    ProjectFilter.ALL, ProjectFilter.SHARED -> parameter("membership", true)
+                    ProjectFilter.STARRED -> parameter("starred", true)
+                    ProjectFilter.PERSONAL -> parameter("owned", true)
+                }
                 parameter("order_by", "last_activity_at")
                 parameter("per_page", 30)
             }
-        }.map { dtos -> dtos.map { it.toProject() } }
+        }.map { dtos ->
+            dtos.map { it.toProject() }
+                // "Shared" = projects you're a member of that live under a group (not your own).
+                .filter { filter != ProjectFilter.SHARED || it.namespaceKind == "group" }
+        }
 }
