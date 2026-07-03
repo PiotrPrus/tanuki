@@ -48,6 +48,7 @@ import dev.tanuki.feature.mergerequests.domain.DiffLine
 import dev.tanuki.feature.mergerequests.domain.DiffLineType
 import dev.tanuki.feature.mergerequests.domain.FileDiff
 import dev.tanuki.feature.mergerequests.domain.MergeRequest
+import dev.tanuki.feature.mergerequests.domain.MergeStatus
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -186,21 +187,31 @@ private fun ActionBar(
 @Composable
 private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: Int) {
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
-        Text(mr.title, style = MaterialTheme.typography.titleLarge)
         Text(
-            text = "${mr.reference} · ${mr.authorName}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp),
+            text = mr.title,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
         )
+        Row(
+            modifier = Modifier.padding(top = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            StatusPill(mr.status)
+            Text(
+                text = "${mr.reference} · ${mr.authorName}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Text(
             text = "${mr.sourceBranch} → ${mr.targetBranch}",
             style = MaterialTheme.typography.bodySmall,
             fontFamily = CodeFontFamily,
             color = MaterialTheme.colorScheme.secondary,
-            modifier = Modifier.padding(top = 8.dp),
+            modifier = Modifier.padding(top = 10.dp),
         )
-        Row(modifier = Modifier.padding(top = 8.dp)) {
+        Row(modifier = Modifier.padding(top = 10.dp)) {
             Text(
                 text = "+$additions",
                 style = MaterialTheme.typography.labelMedium,
@@ -220,16 +231,58 @@ private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: 
             )
         }
         mr.description?.takeIf { it.isNotBlank() }?.let { desc ->
-            Text(
-                text = desc,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 6,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 12.dp),
-            )
+            Description(desc)
         }
     }
 }
+
+@Composable
+private fun Description(text: String) {
+    // TODO(#markdown): render as Markdown (images/video/formatting) — tracked in GitHub issues.
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    var overflowing by remember { mutableStateOf(false) }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        maxLines = if (expanded) Int.MAX_VALUE else COLLAPSED_DESCRIPTION_LINES,
+        overflow = TextOverflow.Ellipsis,
+        onTextLayout = { result -> if (!expanded) overflowing = result.hasVisualOverflow },
+        modifier = Modifier.padding(top = 12.dp),
+    )
+    if (overflowing || expanded) {
+        TextButton(
+            onClick = { expanded = !expanded },
+            contentPadding = PaddingValues(0.dp),
+        ) {
+            Text(if (expanded) "Show less" else "Show more")
+        }
+    }
+}
+
+@Composable
+private fun StatusPill(status: MergeStatus) {
+    val (label, color) = when (status) {
+        MergeStatus.MERGEABLE -> "Mergeable" to TanukiTheme.colors.success
+        MergeStatus.NEEDS_REBASE -> "Needs rebase" to TanukiTheme.colors.warning
+        MergeStatus.DISCUSSIONS_UNRESOLVED -> "Unresolved threads" to MaterialTheme.colorScheme.error
+        MergeStatus.CI_RUNNING -> "CI running" to MaterialTheme.colorScheme.secondary
+        MergeStatus.DRAFT -> "Draft" to MaterialTheme.colorScheme.onSurfaceVariant
+        MergeStatus.CONFLICTS -> "Conflicts" to MaterialTheme.colorScheme.error
+        MergeStatus.BLOCKED -> "Blocked" to MaterialTheme.colorScheme.error
+        MergeStatus.UNKNOWN -> "Open" to MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Surface(color = color.copy(alpha = 0.15f), shape = RoundedCornerShape(6.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Medium,
+            color = color,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+        )
+    }
+}
+
+private const val COLLAPSED_DESCRIPTION_LINES = 6
 
 @Composable
 private fun FileDiffView(file: FileDiff) {
