@@ -2,6 +2,7 @@ package dev.tanuki.core.data.network
 
 import dev.tanuki.core.domain.auth.AuthTokens
 import dev.tanuki.core.domain.auth.TokenStorage
+import dev.tanuki.core.domain.config.InstanceProvider
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.HttpClientEngine
@@ -20,7 +21,11 @@ import kotlinx.serialization.json.Json
 
 object HttpClientFactory {
 
-    fun create(engine: HttpClientEngine, tokenStorage: TokenStorage): HttpClient =
+    fun create(
+        engine: HttpClientEngine,
+        tokenStorage: TokenStorage,
+        instanceProvider: InstanceProvider,
+    ): HttpClient =
         HttpClient(engine) {
             expectSuccess = false
 
@@ -38,7 +43,9 @@ object HttpClientFactory {
             }
 
             install(DefaultRequest) {
-                url(GitLabConfig.API_BASE_URL)
+                // Resolved per request, so switching instance (e.g. a self-hosted PAT
+                // login) takes effect without rebuilding the client.
+                url(instanceProvider.apiBaseUrl())
             }
 
             install(Auth) {
@@ -50,6 +57,12 @@ object HttpClientFactory {
                     }
                     refreshTokens {
                         val current = tokenStorage.getTokens() ?: return@refreshTokens null
+                        // Personal Access Token sessions have no refresh token — a 401
+                        // means the token was revoked/expired, so force a fresh login.
+                        if (current.refreshToken.isBlank()) {
+                            tokenStorage.clear()
+                            return@refreshTokens null
+                        }
                         val response = client.submitForm(
                             url = GitLabConfig.OAUTH_TOKEN_URL,
                             formParameters = parameters {

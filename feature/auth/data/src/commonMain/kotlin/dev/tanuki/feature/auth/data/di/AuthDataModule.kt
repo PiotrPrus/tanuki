@@ -7,6 +7,8 @@ import dev.tanuki.feature.auth.domain.OAuthRedirectHandler
 import org.koin.dsl.module
 
 val authDataModule = module {
-    single<AuthRepository> { AuthRepositoryImpl(httpClient = get(), tokenStorage = get()) }
+    single<AuthRepository> {
+        AuthRepositoryImpl(httpClient = get(), tokenStorage = get(), instanceProvider = get())
+    }
     single<OAuthRedirectHandler> { DefaultOAuthRedirectHandler() }
 }
