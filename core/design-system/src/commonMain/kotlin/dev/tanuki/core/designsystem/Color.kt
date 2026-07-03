@@ -61,10 +61,12 @@ internal val TanukiLightColorScheme = lightColorScheme(
  * diff view. Exposed via [LocalTanukiColors] and `TanukiTheme.colors`.
  */
 data class TanukiColors(
-    val diffAddedBackground: Color = Color(0xFFECFDF5),
-    val diffAddedAccent: Color = Color(0xFF1A7F37),
-    val diffRemovedBackground: Color = Color(0xFFFFF1F2),
-    val diffRemovedAccent: Color = Color(0xFFCF222E),
-    val success: Color = Color(0xFF1A7F37),
+    // Saturated enough to clearly stand out from the cream (unchanged) surface.
+    val diffAddedBackground: Color = Color(0xFFCFEFD6),
+    // Dark green / dark red so +/- read clearly on the light surfaces.
+    val diffAddedAccent: Color = Color(0xFF166534),
+    val diffRemovedBackground: Color = Color(0xFFF9D2D2),
+    val diffRemovedAccent: Color = Color(0xFFB3261E),
+    val success: Color = Color(0xFF166534),
     val warning: Color = Color(0xFFB08800),
 )

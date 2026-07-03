@@ -118,15 +118,25 @@ private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: 
             color = MaterialTheme.colorScheme.secondary,
             modifier = Modifier.padding(top = 8.dp),
         )
-        Text(
-            text = buildString {
-                append("+").append(additions).append(" −").append(deletions)
-                append(" · ").append(fileCount).append(if (fileCount == 1) " file" else " files")
-            },
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 8.dp),
-        )
+        Row(modifier = Modifier.padding(top = 8.dp)) {
+            Text(
+                text = "+$additions",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = TanukiTheme.colors.diffAddedAccent,
+            )
+            Text(
+                text = " −$deletions",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = TanukiTheme.colors.diffRemovedAccent,
+            )
+            Text(
+                text = " · $fileCount " + if (fileCount == 1) "file" else "files",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         mr.description?.takeIf { it.isNotBlank() }?.let { desc ->
             Text(
                 text = desc,
@@ -156,9 +166,16 @@ private fun FileDiffView(file: FileDiff) {
                 modifier = Modifier.weight(1f),
             )
             Text(
-                text = "+${file.additions} −${file.deletions}",
+                text = "+${file.additions}",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Bold,
+                color = TanukiTheme.colors.diffAddedAccent,
+            )
+            Text(
+                text = " −${file.deletions}",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = TanukiTheme.colors.diffRemovedAccent,
             )
         }
         file.lines.forEach { DiffLineRow(it) }
