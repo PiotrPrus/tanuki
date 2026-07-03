@@ -9,6 +9,7 @@ data class MergeRequestDto(
     val iid: Long,
     @SerialName("project_id") val projectId: Long,
     val title: String,
+    val description: String? = null,
     @SerialName("web_url") val webUrl: String,
     @SerialName("source_branch") val sourceBranch: String,
     @SerialName("target_branch") val targetBranch: String,

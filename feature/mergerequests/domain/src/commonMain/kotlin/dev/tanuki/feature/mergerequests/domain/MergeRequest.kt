@@ -13,6 +13,7 @@ data class MergeRequest(
     val targetBranch: String,
     val reference: String,
     val webUrl: String,
+    val description: String?,
     val status: MergeStatus,
     val isDraft: Boolean,
     val hasConflicts: Boolean,

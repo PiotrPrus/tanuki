@@ -6,4 +6,7 @@ import dev.tanuki.core.domain.util.Result
 interface MergeRequestRepository {
     suspend fun getReviewRequested(): Result<List<MergeRequest>, DataError.Remote>
     suspend fun getAssignedToMe(): Result<List<MergeRequest>, DataError.Remote>
+
+    suspend fun getMergeRequest(projectId: Long, iid: Long): Result<MergeRequest, DataError.Remote>
+    suspend fun getDiffs(projectId: Long, iid: Long): Result<List<FileDiff>, DataError.Remote>
 }

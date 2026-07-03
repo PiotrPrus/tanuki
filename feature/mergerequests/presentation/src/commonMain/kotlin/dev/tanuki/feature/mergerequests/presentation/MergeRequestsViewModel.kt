@@ -32,7 +32,12 @@ class MergeRequestsViewModel(
         when (action) {
             MergeRequestsAction.OnRefresh -> load()
             is MergeRequestsAction.OnOpen -> viewModelScope.launch {
-                _events.send(MergeRequestsEvent.OpenInBrowser(action.mergeRequest.webUrl))
+                _events.send(
+                    MergeRequestsEvent.OpenDetail(
+                        projectId = action.mergeRequest.projectId,
+                        iid = action.mergeRequest.iid,
+                    ),
+                )
             }
         }
     }
