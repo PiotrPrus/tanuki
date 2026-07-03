@@ -9,16 +9,25 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -28,11 +37,12 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tanuki.core.designsystem.CodeFontFamily
 import dev.tanuki.core.designsystem.TanukiTheme
+import dev.tanuki.core.presentation.ObserveAsEvents
 import dev.tanuki.feature.mergerequests.domain.DiffLine
 import dev.tanuki.feature.mergerequests.domain.DiffLineType
 import dev.tanuki.feature.mergerequests.domain.FileDiff
 import dev.tanuki.feature.mergerequests.domain.MergeRequest
-import dev.tanuki.core.presentation.ObserveAsEvents
+import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -44,16 +54,25 @@ fun MergeRequestDetailRoot(
     viewModel: MergeRequestDetailViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(projectId, iid) { viewModel.load(projectId, iid) }
 
     ObserveAsEvents(viewModel.events) { event ->
         when (event) {
             is MergeRequestDetailEvent.OpenInBrowser -> onOpenInBrowser(event.url)
+            is MergeRequestDetailEvent.ShowMessage ->
+                scope.launch { snackbarHostState.showSnackbar(event.message) }
         }
     }
 
-    MergeRequestDetailScreen(state = state, onAction = viewModel::onAction, onBack = onBack)
+    MergeRequestDetailScreen(
+        state = state,
+        onAction = viewModel::onAction,
+        onBack = onBack,
+        snackbarHostState = snackbarHostState,
+    )
 }
 
 @Composable
@@ -61,8 +80,9 @@ fun MergeRequestDetailScreen(
     state: MergeRequestDetailState,
     onAction: (MergeRequestDetailAction) -> Unit,
     onBack: () -> Unit,
+    snackbarHostState: SnackbarHostState,
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize().imePadding()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -76,25 +96,81 @@ fun MergeRequestDetailScreen(
             }
         }
 
-        when {
-            state.isLoading -> Box(Modifier.fillMaxSize(), Alignment.Center) {
-                CircularProgressIndicator()
-            }
-            state.error != null -> Box(Modifier.fillMaxSize(), Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(state.error.asString(), color = MaterialTheme.colorScheme.error)
-                    TextButton(onClick = { onAction(MergeRequestDetailAction.OnRetry) }) { Text("Retry") }
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            when {
+                state.isLoading -> Box(Modifier.fillMaxSize(), Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+                state.error != null -> Box(Modifier.fillMaxSize(), Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(state.error.asString(), color = MaterialTheme.colorScheme.error)
+                        TextButton(onClick = { onAction(MergeRequestDetailAction.OnRetry) }) { Text("Retry") }
+                    }
+                }
+                else -> LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
+                    state.mergeRequest?.let { mr ->
+                        item { Header(mr, state.totalAdditions, state.totalDeletions, state.diffs.size) }
+                    }
+                    items(
+                        count = state.diffs.size,
+                        key = { index -> state.diffs[index].newPath + index },
+                    ) { index ->
+                        FileDiffView(state.diffs[index])
+                    }
                 }
             }
-            else -> LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
-                state.mergeRequest?.let { mr ->
-                    item { Header(mr, state.totalAdditions, state.totalDeletions, state.diffs.size) }
+            SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+        }
+
+        if (state.mergeRequest != null && state.error == null) {
+            ActionBar(state = state, onAction = onAction)
+        }
+    }
+}
+
+@Composable
+private fun ActionBar(
+    state: MergeRequestDetailState,
+    onAction: (MergeRequestDetailAction) -> Unit,
+) {
+    Surface(tonalElevation = 3.dp, color = MaterialTheme.colorScheme.surfaceContainer) {
+        Column(Modifier.fillMaxWidth().padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = state.commentText,
+                    onValueChange = { onAction(MergeRequestDetailAction.OnCommentChange(it)) },
+                    placeholder = { Text("Add a comment") },
+                    singleLine = true,
+                    enabled = !state.actionInProgress,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(8.dp))
+                Button(
+                    onClick = { onAction(MergeRequestDetailAction.OnSendComment) },
+                    enabled = state.commentText.isNotBlank() && !state.actionInProgress,
+                ) {
+                    Text("Send")
                 }
-                items(
-                    count = state.diffs.size,
-                    key = { index -> state.diffs[index].newPath + index },
-                ) { index ->
-                    FileDiffView(state.diffs[index])
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Button(
+                    onClick = { onAction(MergeRequestDetailAction.OnApprove) },
+                    enabled = !state.approved && !state.actionInProgress,
+                    colors = ButtonDefaults.buttonColors(containerColor = TanukiTheme.colors.success),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(if (state.approved) "Approved ✓" else "Approve")
+                }
+                Button(
+                    onClick = { onAction(MergeRequestDetailAction.OnMerge) },
+                    enabled = !state.actionInProgress,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Merge")
                 }
             }
         }
