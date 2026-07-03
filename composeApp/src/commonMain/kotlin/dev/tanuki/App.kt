@@ -8,6 +8,7 @@ import androidx.navigation.compose.rememberNavController
 import dev.tanuki.core.designsystem.TanukiTheme
 import dev.tanuki.feature.auth.presentation.LoginRoot
 import dev.tanuki.feature.mergerequests.presentation.MergeRequestsRoot
+import dev.tanuki.feature.projects.presentation.ProjectsRoot
 import dev.tanuki.navigation.Routes
 import org.koin.compose.KoinContext
 
@@ -25,13 +26,18 @@ fun App() {
                 composable<Routes.Login> {
                     LoginRoot(
                         onLoggedIn = {
-                            navController.navigate(Routes.MergeRequests) {
+                            navController.navigate(Routes.Projects) {
                                 popUpTo(Routes.Login) { inclusive = true }
                             }
                         },
-                        // Opens the system browser for the OAuth flow. Capturing the
-                        // custom-scheme redirect back into the app is the next milestone.
+                        // Opens the system browser for OAuth; the redirect is captured by
+                        // the platform (Android intent / iOS onOpenURL) → OAuthRedirectHandler.
                         onLaunchOAuth = { url -> uriHandler.openUri(url) },
+                    )
+                }
+                composable<Routes.Projects> {
+                    ProjectsRoot(
+                        onOpenInBrowser = { url -> uriHandler.openUri(url) },
                     )
                 }
                 composable<Routes.MergeRequests> {

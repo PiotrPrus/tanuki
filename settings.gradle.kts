@@ -42,3 +42,7 @@ include(":feature:auth:presentation")
 include(":feature:mergerequests:domain")
 include(":feature:mergerequests:data")
 include(":feature:mergerequests:presentation")
+
+include(":feature:projects:domain")
+include(":feature:projects:data")
+include(":feature:projects:presentation")

@@ -7,5 +7,8 @@ sealed interface Routes {
     data object Login : Routes
 
     @Serializable
+    data object Projects : Routes
+
+    @Serializable
     data object MergeRequests : Routes
 }

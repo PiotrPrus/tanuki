@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.tanuki.core.domain.util.Result
 import dev.tanuki.core.presentation.UiText
 import dev.tanuki.feature.auth.domain.AuthRepository
+import dev.tanuki.feature.auth.domain.OAuthRedirectHandler
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,6 +15,7 @@ import kotlinx.coroutines.launch
 
 class LoginViewModel(
     private val authRepository: AuthRepository,
+    private val redirectHandler: OAuthRedirectHandler,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(LoginState())
@@ -25,6 +27,15 @@ class LoginViewModel(
     // Kept in memory for the duration of a single login attempt.
     private var pendingVerifier: String? = null
     private var pendingState: String? = null
+
+    init {
+        // Redirects captured by the platform (Android intent / iOS onOpenURL) flow in here.
+        viewModelScope.launch {
+            redirectHandler.callbacks.collect { callback ->
+                completeLogin(callback.code, callback.state)
+            }
+        }
+    }
 
     fun onAction(action: LoginAction) {
         when (action) {
