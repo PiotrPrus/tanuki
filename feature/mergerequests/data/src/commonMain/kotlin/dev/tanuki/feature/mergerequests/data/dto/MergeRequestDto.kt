@@ -1,0 +1,34 @@
+package dev.tanuki.feature.mergerequests.data.dto
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class MergeRequestDto(
+    val id: Long,
+    val iid: Long,
+    @SerialName("project_id") val projectId: Long,
+    val title: String,
+    @SerialName("web_url") val webUrl: String,
+    @SerialName("source_branch") val sourceBranch: String,
+    @SerialName("target_branch") val targetBranch: String,
+    val draft: Boolean = false,
+    @SerialName("has_conflicts") val hasConflicts: Boolean = false,
+    @SerialName("user_notes_count") val userNotesCount: Int = 0,
+    @SerialName("detailed_merge_status") val detailedMergeStatus: String? = null,
+    @SerialName("blocking_discussions_resolved") val blockingDiscussionsResolved: Boolean = true,
+    @SerialName("updated_at") val updatedAt: String,
+    val author: AuthorDto,
+    val references: ReferencesDto? = null,
+)
+
+@Serializable
+data class AuthorDto(
+    val name: String,
+    @SerialName("avatar_url") val avatarUrl: String? = null,
+)
+
+@Serializable
+data class ReferencesDto(
+    val full: String? = null,
+)

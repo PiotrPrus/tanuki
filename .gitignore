@@ -1,0 +1,25 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+build/
+captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Kotlin/Native & KMP
+*.klib
+kotlin-js-store
+
+# iOS / Xcode
+xcuserdata/
+*.xcworkspace/xcuserdata/
+/iosApp/Pods
+/iosApp/build
+DerivedData/
+
+# Kotlin
+.kotlin/
