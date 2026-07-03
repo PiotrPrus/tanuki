@@ -1,6 +1,13 @@
 package dev.tanuki
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -16,13 +23,20 @@ import org.koin.compose.KoinContext
 fun App() {
     KoinContext {
         TanukiTheme {
-            val navController = rememberNavController()
-            val uriHandler = LocalUriHandler.current
-
-            NavHost(
-                navController = navController,
-                startDestination = Routes.Login,
+            // Background fills edge-to-edge (behind the system bars); content is inset so
+            // it clears the status bar and the bottom navigation bar.
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background,
             ) {
+                val navController = rememberNavController()
+                val uriHandler = LocalUriHandler.current
+
+                NavHost(
+                    navController = navController,
+                    startDestination = Routes.Login,
+                    modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars),
+                ) {
                 composable<Routes.Login> {
                     LoginRoot(
                         onLoggedIn = {
@@ -44,6 +58,7 @@ fun App() {
                     MergeRequestsRoot(
                         onOpenInBrowser = { url -> uriHandler.openUri(url) },
                     )
+                }
                 }
             }
         }
