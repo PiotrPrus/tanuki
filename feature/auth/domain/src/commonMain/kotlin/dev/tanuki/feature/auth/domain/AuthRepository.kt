@@ -20,6 +20,15 @@ interface AuthRepository {
         codeVerifier: String,
     ): EmptyResult<DataError.Remote>
 
+    /**
+     * Log in with a Personal Access Token against [instanceBaseUrl] (e.g. a self-hosted
+     * GitLab). Validates the token, sets the active instance, and persists it as the session.
+     */
+    suspend fun loginWithToken(
+        instanceBaseUrl: String,
+        token: String,
+    ): EmptyResult<DataError.Remote>
+
     suspend fun isLoggedIn(): Boolean
 
     suspend fun logout()

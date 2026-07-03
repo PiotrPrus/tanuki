@@ -8,9 +8,12 @@ kotlin {
             // Feature UIs
             implementation(project(":feature:auth:presentation"))
             implementation(project(":feature:mergerequests:presentation"))
+            implementation(project(":feature:projects:presentation"))
             // Feature data + core (wired into Koin at app startup)
+            implementation(project(":feature:auth:domain"))
             implementation(project(":feature:auth:data"))
             implementation(project(":feature:mergerequests:data"))
+            implementation(project(":feature:projects:data"))
             implementation(project(":core:domain"))
             implementation(project(":core:data"))
             implementation(project(":core:presentation"))
