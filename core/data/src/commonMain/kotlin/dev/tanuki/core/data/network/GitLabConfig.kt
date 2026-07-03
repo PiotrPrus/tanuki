@@ -14,8 +14,7 @@ object GitLabConfig {
     const val OAUTH_AUTHORIZE_URL = "$HOST/oauth/authorize"
     const val OAUTH_TOKEN_URL = "$HOST/oauth/token"
 
-    // TODO: replace with the real Application ID from gitlab.com.
-    const val CLIENT_ID = "REPLACE_WITH_APPLICATION_ID"
+    const val CLIENT_ID = "25659635067dc8daf08d8a586de6c7c87a8d38bf71059ed802874be047d369e2"
     const val REDIRECT_URI = "dev.tanuki://oauth-callback"
     const val SCOPE = "api"
 }
