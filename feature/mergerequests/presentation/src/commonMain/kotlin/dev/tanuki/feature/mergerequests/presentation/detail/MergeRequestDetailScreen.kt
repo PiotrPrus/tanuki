@@ -1,6 +1,7 @@
 package dev.tanuki.feature.mergerequests.presentation.detail
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,10 +27,15 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -227,20 +233,47 @@ private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: 
 
 @Composable
 private fun FileDiffView(file: FileDiff) {
-    Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+    var expanded by rememberSaveable(file.newPath) { mutableStateOf(true) }
+    val path = if (file.isDeleted) file.oldPath else file.newPath
+    val name = path.substringAfterLast('/')
+    val dir = path.substringBeforeLast('/', missingDelimiterValue = "")
+
+    Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceContainer)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 8.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .clickable { expanded = !expanded }
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = if (file.isDeleted) file.oldPath else file.newPath,
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = CodeFontFamily,
-                modifier = Modifier.weight(1f),
+                text = if (expanded) "▾" else "▸",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.width(18.dp),
             )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontFamily = CodeFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (dir.isNotEmpty()) {
+                    Text(
+                        text = dir,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = CodeFontFamily,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
             Text(
                 text = "+${file.additions}",
                 style = MaterialTheme.typography.labelMedium,
@@ -254,7 +287,9 @@ private fun FileDiffView(file: FileDiff) {
                 color = TanukiTheme.colors.diffRemovedAccent,
             )
         }
-        file.lines.forEach { DiffLineRow(it) }
+        if (expanded) {
+            file.lines.forEach { DiffLineRow(it) }
+        }
     }
 }
 
