@@ -32,14 +32,14 @@ import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun MergeRequestsRoot(
-    onOpenInBrowser: (url: String) -> Unit,
+    onOpenMergeRequest: (projectId: Long, iid: Long) -> Unit,
     viewModel: MergeRequestsViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     ObserveAsEvents(viewModel.events) { event ->
         when (event) {
-            is MergeRequestsEvent.OpenInBrowser -> onOpenInBrowser(event.url)
+            is MergeRequestsEvent.OpenDetail -> onOpenMergeRequest(event.projectId, event.iid)
         }
     }
 

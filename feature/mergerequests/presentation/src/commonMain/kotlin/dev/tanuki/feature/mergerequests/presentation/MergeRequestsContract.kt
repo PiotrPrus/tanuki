@@ -15,5 +15,5 @@ sealed interface MergeRequestsAction {
 }
 
 sealed interface MergeRequestsEvent {
-    data class OpenInBrowser(val url: String) : MergeRequestsEvent
+    data class OpenDetail(val projectId: Long, val iid: Long) : MergeRequestsEvent
 }

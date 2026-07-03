@@ -10,5 +10,8 @@ sealed interface Routes {
     data object Projects : Routes
 
     @Serializable
-    data object MergeRequests : Routes
+    data object Reviews : Routes
+
+    @Serializable
+    data class MergeRequestDetail(val projectId: Long, val iid: Long) : Routes
 }

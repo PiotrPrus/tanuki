@@ -16,6 +16,7 @@ fun MergeRequestDto.toMergeRequest(): MergeRequest = MergeRequest(
     targetBranch = targetBranch,
     reference = references?.full ?: "!$iid",
     webUrl = webUrl,
+    description = description,
     status = detailedMergeStatus.toMergeStatus(isDraft = draft, hasConflicts = hasConflicts),
     isDraft = draft,
     hasConflicts = hasConflicts,

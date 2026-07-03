@@ -3,24 +3,36 @@ package dev.tanuki
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.navigation.NavDestination
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import dev.tanuki.core.designsystem.TanukiTheme
 import dev.tanuki.feature.auth.domain.AuthRepository
 import dev.tanuki.feature.auth.presentation.LoginRoot
 import dev.tanuki.feature.mergerequests.presentation.MergeRequestsRoot
+import dev.tanuki.feature.mergerequests.presentation.detail.MergeRequestDetailRoot
 import dev.tanuki.feature.projects.presentation.ProjectsRoot
 import dev.tanuki.navigation.Routes
 import org.koin.compose.KoinContext
@@ -30,54 +42,104 @@ import org.koin.compose.koinInject
 fun App() {
     KoinContext {
         TanukiTheme {
-            // Background fills edge-to-edge (behind the system bars); content is inset so
-            // it clears the status bar and the bottom navigation bar.
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = MaterialTheme.colorScheme.background,
-            ) {
+            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                 val authRepository = koinInject<AuthRepository>()
                 // Restore the persisted session on launch — skip Login if a token is stored.
                 val loggedIn by produceState<Boolean?>(initialValue = null) {
                     value = authRepository.isLoggedIn()
                 }
 
-                val contentModifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars)
-
                 when (val isLoggedIn = loggedIn) {
-                    null -> Box(contentModifier, Alignment.Center) {
+                    null -> Box(
+                        modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars),
+                        contentAlignment = Alignment.Center,
+                    ) {
                         CircularProgressIndicator()
                     }
-                    else -> {
-                        val navController = rememberNavController()
-                        val uriHandler = LocalUriHandler.current
-                        NavHost(
-                            navController = navController,
-                            startDestination = if (isLoggedIn) Routes.Projects else Routes.Login,
-                            modifier = contentModifier,
-                        ) {
-                            composable<Routes.Login> {
-                                LoginRoot(
-                                    onLoggedIn = {
-                                        navController.navigate(Routes.Projects) {
-                                            popUpTo(Routes.Login) { inclusive = true }
-                                        }
-                                    },
-                                    // Opens the system browser for OAuth; the redirect is captured
-                                    // by the platform → OAuthRedirectHandler.
-                                    onLaunchOAuth = { url -> uriHandler.openUri(url) },
-                                )
-                            }
-                            composable<Routes.Projects> {
-                                ProjectsRoot(onOpenInBrowser = { url -> uriHandler.openUri(url) })
-                            }
-                            composable<Routes.MergeRequests> {
-                                MergeRequestsRoot(onOpenInBrowser = { url -> uriHandler.openUri(url) })
-                            }
-                        }
-                    }
+                    else -> AppScaffold(startLoggedIn = isLoggedIn)
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun AppScaffold(startLoggedIn: Boolean) {
+    val navController = rememberNavController()
+    val uriHandler = LocalUriHandler.current
+    val currentEntry by navController.currentBackStackEntryAsState()
+    val destination = currentEntry?.destination
+
+    Scaffold(
+        bottomBar = {
+            if (destination.isTopLevel()) {
+                TanukiBottomBar(navController = navController, destination = destination)
+            }
+        },
+    ) { padding ->
+        NavHost(
+            navController = navController,
+            startDestination = if (startLoggedIn) Routes.Projects else Routes.Login,
+            modifier = Modifier.fillMaxSize().padding(padding),
+        ) {
+            composable<Routes.Login> {
+                LoginRoot(
+                    onLoggedIn = {
+                        navController.navigate(Routes.Projects) {
+                            popUpTo(Routes.Login) { inclusive = true }
+                        }
+                    },
+                    onLaunchOAuth = { url -> uriHandler.openUri(url) },
+                )
+            }
+            composable<Routes.Projects> {
+                ProjectsRoot(onOpenInBrowser = { url -> uriHandler.openUri(url) })
+            }
+            composable<Routes.Reviews> {
+                MergeRequestsRoot(
+                    onOpenMergeRequest = { projectId, iid ->
+                        navController.navigate(Routes.MergeRequestDetail(projectId, iid))
+                    },
+                )
+            }
+            composable<Routes.MergeRequestDetail> { entry ->
+                val route = entry.toRoute<Routes.MergeRequestDetail>()
+                MergeRequestDetailRoot(
+                    projectId = route.projectId,
+                    iid = route.iid,
+                    onBack = { navController.popBackStack() },
+                    onOpenInBrowser = { url -> uriHandler.openUri(url) },
+                )
+            }
+        }
+    }
+}
+
+private fun NavDestination?.isTopLevel(): Boolean =
+    this?.hasRoute<Routes.Projects>() == true || this?.hasRoute<Routes.Reviews>() == true
+
+@Composable
+private fun TanukiBottomBar(navController: NavHostController, destination: NavDestination?) {
+    NavigationBar {
+        NavigationBarItem(
+            selected = destination?.hasRoute<Routes.Projects>() == true,
+            onClick = { navController.switchTab(Routes.Projects) },
+            icon = { Text("📁") },
+            label = { Text("Projects") },
+        )
+        NavigationBarItem(
+            selected = destination?.hasRoute<Routes.Reviews>() == true,
+            onClick = { navController.switchTab(Routes.Reviews) },
+            icon = { Text("🔀") },
+            label = { Text("Reviews") },
+        )
+    }
+}
+
+private fun NavHostController.switchTab(route: Routes) {
+    navigate(route) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
     }
 }
