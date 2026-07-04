@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -48,6 +49,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -61,6 +63,8 @@ import dev.tanuki.feature.mergerequests.domain.DiffLineType
 import dev.tanuki.feature.mergerequests.domain.FileDiff
 import dev.tanuki.feature.mergerequests.domain.MergeRequest
 import dev.tanuki.feature.mergerequests.domain.MergeStatus
+import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
+import com.mikepenz.markdown.m3.Markdown
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -321,31 +325,53 @@ private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: 
             )
         }
         mr.description?.takeIf { it.isNotBlank() }?.let { desc ->
-            Description(desc)
+            Description(desc, projectBaseUrl = mr.webUrl.substringBefore("/-/"))
         }
     }
 }
 
 @Composable
-private fun Description(text: String) {
-    // TODO(#6/#7): render as Markdown + inline images/video.
+private fun Description(markdown: String, projectBaseUrl: String) {
     var expanded by rememberSaveable { mutableStateOf(false) }
-    var overflowing by remember { mutableStateOf(false) }
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodyMedium,
-        maxLines = if (expanded) Int.MAX_VALUE else COLLAPSED_DESCRIPTION_LINES,
-        overflow = TextOverflow.Ellipsis,
-        onTextLayout = { result -> if (!expanded) overflowing = result.hasVisualOverflow },
-        modifier = Modifier.padding(top = 12.dp),
-    )
-    if (overflowing || expanded) {
+    val rendered = remember(markdown, projectBaseUrl) { prepareMarkdown(markdown, projectBaseUrl) }
+    val collapsible = markdown.length > 400
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp)
+            .then(if (collapsible && !expanded) Modifier.heightIn(max = 260.dp) else Modifier)
+            .clipToBounds(),
+    ) {
+        Markdown(
+            content = rendered,
+            imageTransformer = Coil3ImageTransformerImpl,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+    if (collapsible) {
         TextButton(
             onClick = { expanded = !expanded },
             contentPadding = PaddingValues(0.dp),
         ) {
             Text(if (expanded) "Show less" else "Show more")
         }
+    }
+}
+
+private val RELATIVE_URL = Regex("""]\((/[^)\s]*)\)""")
+private val VIDEO_EMBED =
+    Regex("""!\[([^\]]*)]\(([^)\s]+\.(?:mov|mp4|webm|m4v|avi))\)""", RegexOption.IGNORE_CASE)
+// GitLab appends sizing attributes like `){width=274 height=600}` — not standard Markdown.
+private val MEDIA_ATTRS = Regex("""(\))\{[^}\n]*}""")
+
+/** Resolve GitLab root-relative upload URLs to absolute, and turn video embeds into tappable links. */
+private fun prepareMarkdown(markdown: String, projectBaseUrl: String): String {
+    val absolute = RELATIVE_URL.replace(markdown) { m -> "](${projectBaseUrl}${m.groupValues[1]})" }
+    val noAttrs = MEDIA_ATTRS.replace(absolute) { m -> m.groupValues[1] }
+    return VIDEO_EMBED.replace(noAttrs) { m ->
+        val label = m.groupValues[1].ifBlank { "Video" }
+        "[▶ $label](${m.groupValues[2]})"
     }
 }
 
@@ -487,5 +513,3 @@ private fun DiffLineRow(line: DiffLine) {
         )
     }
 }
-
-private const val COLLAPSED_DESCRIPTION_LINES = 6
