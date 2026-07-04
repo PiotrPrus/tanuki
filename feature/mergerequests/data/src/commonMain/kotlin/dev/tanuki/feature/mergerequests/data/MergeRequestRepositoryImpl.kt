@@ -1,7 +1,9 @@
 package dev.tanuki.feature.mergerequests.data
 
 import dev.tanuki.core.data.network.safeCall
+import dev.tanuki.core.data.network.safeCallEmpty
 import dev.tanuki.core.domain.util.DataError
+import dev.tanuki.core.domain.util.EmptyResult
 import dev.tanuki.core.domain.util.Result
 import dev.tanuki.core.domain.util.map
 import dev.tanuki.feature.mergerequests.data.dto.DiffDto
@@ -14,6 +16,8 @@ import dev.tanuki.feature.mergerequests.domain.MergeRequestRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
+import io.ktor.client.request.post
+import io.ktor.client.request.put
 
 class MergeRequestRepositoryImpl(
     private val httpClient: HttpClient,
@@ -40,6 +44,27 @@ class MergeRequestRepositoryImpl(
                 parameter("per_page", 50)
             }
         }.map { dtos -> dtos.map { it.toFileDiff() } }
+
+    override suspend fun approve(projectId: Long, iid: Long): EmptyResult<DataError.Remote> =
+        safeCallEmpty {
+            httpClient.post("projects/$projectId/merge_requests/$iid/approve")
+        }
+
+    override suspend fun merge(projectId: Long, iid: Long): EmptyResult<DataError.Remote> =
+        safeCallEmpty {
+            httpClient.put("projects/$projectId/merge_requests/$iid/merge")
+        }
+
+    override suspend fun comment(
+        projectId: Long,
+        iid: Long,
+        body: String,
+    ): EmptyResult<DataError.Remote> =
+        safeCallEmpty {
+            httpClient.post("projects/$projectId/merge_requests/$iid/notes") {
+                parameter("body", body)
+            }
+        }
 
     private suspend fun fetch(scope: String): Result<List<MergeRequest>, DataError.Remote> =
         safeCall<List<MergeRequestDto>> {
