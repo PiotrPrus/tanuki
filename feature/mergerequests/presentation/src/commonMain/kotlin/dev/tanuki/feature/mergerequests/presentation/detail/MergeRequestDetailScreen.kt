@@ -65,6 +65,7 @@ import dev.tanuki.feature.mergerequests.domain.MergeRequest
 import dev.tanuki.feature.mergerequests.domain.MergeStatus
 import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
 import com.mikepenz.markdown.m3.Markdown
+import com.mikepenz.markdown.m3.markdownTypography
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -346,10 +347,22 @@ private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: 
 @Composable
 private fun Description(markdown: String, projectBaseUrl: String, projectId: Long, authToken: String?) {
     var expanded by rememberSaveable { mutableStateOf(false) }
-    val prepared = remember(markdown, projectBaseUrl, projectId) {
-        prepareMarkdown(markdown, projectBaseUrl, projectId)
+    val blocks = remember(markdown, projectBaseUrl, projectId) {
+        prepareDescription(markdown, projectBaseUrl, projectId)
     }
-    val collapsible = prepared.markdown.length > 400
+    val hasVideo = blocks.any { it is DescriptionBlock.Video }
+    // Only collapse text-only descriptions; keep video descriptions fully visible.
+    val collapsible = !hasVideo && markdown.length > 400
+
+    // Headings one step smaller than the library defaults.
+    val typography = markdownTypography(
+        h1 = MaterialTheme.typography.headlineSmall,
+        h2 = MaterialTheme.typography.titleLarge,
+        h3 = MaterialTheme.typography.titleMedium,
+        h4 = MaterialTheme.typography.titleSmall,
+        h5 = MaterialTheme.typography.bodyLarge,
+        h6 = MaterialTheme.typography.bodyMedium,
+    )
 
     Box(
         modifier = Modifier
@@ -358,11 +371,24 @@ private fun Description(markdown: String, projectBaseUrl: String, projectId: Lon
             .then(if (collapsible && !expanded) Modifier.heightIn(max = 260.dp) else Modifier)
             .clipToBounds(),
     ) {
-        Markdown(
-            content = prepared.markdown,
-            imageTransformer = Coil3ImageTransformerImpl,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        Column {
+            blocks.forEach { block ->
+                when (block) {
+                    is DescriptionBlock.Md -> Markdown(
+                        content = block.markdown,
+                        imageTransformer = Coil3ImageTransformerImpl,
+                        typography = typography,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    is DescriptionBlock.Video -> InlineVideo(
+                        url = block.url,
+                        authToken = authToken,
+                        aspectRatio = block.aspectRatio,
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    )
+                }
+            }
+        }
     }
     if (collapsible) {
         TextButton(
@@ -371,14 +397,6 @@ private fun Description(markdown: String, projectBaseUrl: String, projectId: Lon
         ) {
             Text(if (expanded) "Show less" else "Show more")
         }
-    }
-    prepared.videos.forEach { video ->
-        InlineVideo(
-            url = video.url,
-            authToken = authToken,
-            aspectRatio = video.aspectRatio,
-            modifier = Modifier.padding(top = 12.dp),
-        )
     }
 }
 
@@ -395,37 +413,50 @@ private val HOST = Regex("""^https?://[^/]+""")
 private val WIDTH = Regex("""width=(\d+)""")
 private val HEIGHT = Regex("""height=(\d+)""")
 
-private data class VideoRef(val url: String, val aspectRatio: Float?)
-private data class PreparedDescription(val markdown: String, val videos: List<VideoRef>)
+private sealed interface DescriptionBlock {
+    data class Md(val markdown: String) : DescriptionBlock
+    data class Video(val url: String, val aspectRatio: Float?) : DescriptionBlock
+}
 
 /**
- * Prepare a GitLab description for rendering. Upload URLs are rewritten to the authenticated
- * API form (`/api/v4/projects/:id/uploads/:secret/:file`) — the web `/uploads/` route is
- * session-only, but the API route accepts our OAuth token. Video embeds are pulled out to
- * render as inline players, carrying any width/height so vertical clips get a portrait frame.
+ * Split a GitLab description into ordered blocks — Markdown text and inline videos — so
+ * they render in their original position. Upload URLs are rewritten to the authenticated
+ * API form (`/api/v4/projects/:id/uploads/:secret/:file`); the web `/uploads/` route is
+ * session-only, but the API route accepts our OAuth token.
  */
-private fun prepareMarkdown(
+private fun prepareDescription(
     markdown: String,
     projectBaseUrl: String,
     projectId: Long,
-): PreparedDescription {
+): List<DescriptionBlock> {
     val host = HOST.find(projectBaseUrl)?.value ?: projectBaseUrl
-    val videos = mutableListOf<VideoRef>()
-
-    var md = VIDEO_EMBED.replace(markdown) { m ->
+    val blocks = mutableListOf<DescriptionBlock>()
+    var last = 0
+    for (m in VIDEO_EMBED.findAll(markdown)) {
+        processText(markdown.substring(last, m.range.first), host, projectBaseUrl, projectId)
+            ?.let { blocks += DescriptionBlock.Md(it) }
         val attrs = m.groupValues[2]
         val w = WIDTH.find(attrs)?.groupValues?.get(1)?.toFloatOrNull()
         val h = HEIGHT.find(attrs)?.groupValues?.get(1)?.toFloatOrNull()
         val aspect = if (w != null && h != null && h > 0f) w / h else null
-        videos += VideoRef(toApiUploadUrl(m.groupValues[1], host, projectId), aspect)
-        ""
+        blocks += DescriptionBlock.Video(toApiUploadUrl(m.groupValues[1], host, projectId), aspect)
+        last = m.range.last + 1
     }
-    md = IMAGE_UPLOAD.replace(md) { m ->
+    processText(markdown.substring(last), host, projectBaseUrl, projectId)
+        ?.let { blocks += DescriptionBlock.Md(it) }
+    return blocks
+}
+
+/** Rewrite image upload URLs to the API form, resolve other relative links, strip media attrs. */
+private fun processText(text: String, host: String, projectBaseUrl: String, projectId: Long): String? {
+    val trimmed = text.trim()
+    if (trimmed.isEmpty()) return null
+    var t = IMAGE_UPLOAD.replace(trimmed) { m ->
         "${m.groupValues[1]}${toApiUploadUrl(m.groupValues[2], host, projectId)}${m.groupValues[3]}"
     }
-    md = RELATIVE_URL.replace(md) { m -> "](${projectBaseUrl}${m.groupValues[1]})" }
-    md = MEDIA_ATTRS.replace(md) { m -> m.groupValues[1] }
-    return PreparedDescription(markdown = md.trim(), videos = videos)
+    t = RELATIVE_URL.replace(t) { m -> "](${projectBaseUrl}${m.groupValues[1]})" }
+    t = MEDIA_ATTRS.replace(t) { m -> m.groupValues[1] }
+    return t
 }
 
 /** Rewrite a `/uploads/:secret/:file` URL (relative or absolute) to the token-authenticated API path. */
