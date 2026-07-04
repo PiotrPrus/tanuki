@@ -345,7 +345,9 @@ private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: 
 @Composable
 private fun Description(markdown: String, projectBaseUrl: String, authToken: String?) {
     var expanded by rememberSaveable { mutableStateOf(false) }
-    val prepared = remember(markdown, projectBaseUrl) { prepareMarkdown(markdown, projectBaseUrl) }
+    val prepared = remember(markdown, projectBaseUrl, authToken) {
+        prepareMarkdown(markdown, projectBaseUrl, authToken)
+    }
     val collapsible = prepared.markdown.length > 400
 
     Box(
@@ -379,22 +381,41 @@ private val VIDEO_EMBED =
     Regex("""!\[([^\]]*)]\(([^)\s]+\.(?:mov|mp4|webm|m4v|avi))\)""", RegexOption.IGNORE_CASE)
 // GitLab appends sizing attributes like `){width=274 height=600}` — not standard Markdown.
 private val MEDIA_ATTRS = Regex("""(\))\{[^}\n]*\}""")
+private val UPLOAD_URL = Regex("""]\((https?://[^)\s]*/uploads/[^)\s]*)\)""")
 
 private data class PreparedDescription(val markdown: String, val videoUrls: List<String>)
 
 /**
- * Resolve GitLab root-relative upload URLs to absolute, strip media size attrs, and pull
- * video embeds out of the Markdown so they can render as inline players.
+ * Prepare a GitLab description for rendering:
+ * 1. resolve root-relative `/uploads` URLs to absolute,
+ * 2. strip `{width= height=}` media attrs,
+ * 3. authenticate upload URLs with `?access_token=` (GitLab's web routes don't honor the
+ *    OAuth bearer header — they take the token as a query param),
+ * 4. pull video embeds out so they render as inline players.
  */
-private fun prepareMarkdown(markdown: String, projectBaseUrl: String): PreparedDescription {
+private fun prepareMarkdown(
+    markdown: String,
+    projectBaseUrl: String,
+    accessToken: String?,
+): PreparedDescription {
     val absolute = RELATIVE_URL.replace(markdown) { m -> "](${projectBaseUrl}${m.groupValues[1]})" }
     val noAttrs = MEDIA_ATTRS.replace(absolute) { m -> m.groupValues[1] }
     val videos = mutableListOf<String>()
     val withoutVideos = VIDEO_EMBED.replace(noAttrs) { m ->
-        videos += m.groupValues[2]
+        videos += authenticateUpload(m.groupValues[2], accessToken)
         ""
     }
-    return PreparedDescription(markdown = withoutVideos.trim(), videoUrls = videos)
+    // Authenticate remaining upload URLs (inline images) so Coil can load them.
+    val authenticated = UPLOAD_URL.replace(withoutVideos) { m ->
+        "](${authenticateUpload(m.groupValues[1], accessToken)})"
+    }
+    return PreparedDescription(markdown = authenticated.trim(), videoUrls = videos)
+}
+
+private fun authenticateUpload(url: String, accessToken: String?): String {
+    if (accessToken == null || "/uploads/" !in url || "access_token=" in url) return url
+    val separator = if ('?' in url) '&' else '?'
+    return "$url${separator}access_token=$accessToken"
 }
 
 @Composable
