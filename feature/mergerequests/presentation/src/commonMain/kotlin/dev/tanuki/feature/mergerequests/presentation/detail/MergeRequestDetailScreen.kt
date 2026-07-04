@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -49,7 +48,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -350,9 +348,6 @@ private fun Description(markdown: String, projectBaseUrl: String, projectId: Lon
     val blocks = remember(markdown, projectBaseUrl, projectId) {
         prepareDescription(markdown, projectBaseUrl, projectId)
     }
-    val hasVideo = blocks.any { it is DescriptionBlock.Video }
-    // Only collapse text-only descriptions; keep video descriptions fully visible.
-    val collapsible = !hasVideo && markdown.length > 400
 
     // Headings one step smaller than the library defaults.
     val typography = markdownTypography(
@@ -364,38 +359,46 @@ private fun Description(markdown: String, projectBaseUrl: String, projectId: Lon
         h6 = MaterialTheme.typography.bodyMedium,
     )
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 12.dp)
-            .then(if (collapsible && !expanded) Modifier.heightIn(max = 260.dp) else Modifier)
-            .clipToBounds(),
-    ) {
-        Column {
-            blocks.forEach { block ->
-                when (block) {
-                    is DescriptionBlock.Md -> Markdown(
-                        content = block.markdown,
-                        imageTransformer = Coil3ImageTransformerImpl,
-                        typography = typography,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    is DescriptionBlock.Video -> InlineVideo(
-                        url = block.url,
-                        authToken = authToken,
-                        aspectRatio = block.aspectRatio,
-                        modifier = Modifier.padding(vertical = 8.dp),
-                    )
+    Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .clickable { expanded = !expanded }
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = if (expanded) "▾" else "▸",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.width(18.dp),
+            )
+            Text(
+                text = "Description",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        if (expanded) {
+            Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                blocks.forEach { block ->
+                    when (block) {
+                        is DescriptionBlock.Md -> Markdown(
+                            content = block.markdown,
+                            imageTransformer = Coil3ImageTransformerImpl,
+                            typography = typography,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        is DescriptionBlock.Video -> InlineVideo(
+                            url = block.url,
+                            authToken = authToken,
+                            aspectRatio = block.aspectRatio,
+                            modifier = Modifier.padding(vertical = 8.dp),
+                        )
+                    }
                 }
             }
-        }
-    }
-    if (collapsible) {
-        TextButton(
-            onClick = { expanded = !expanded },
-            contentPadding = PaddingValues(0.dp),
-        ) {
-            Text(if (expanded) "Show less" else "Show more")
         }
     }
 }
