@@ -23,7 +23,12 @@ import androidx.compose.ui.unit.dp
  * iOS: opens externally for now (native AVPlayer is a follow-up — see issue #7).
  */
 @Composable
-expect fun InlineVideo(url: String, authToken: String?, modifier: Modifier = Modifier)
+expect fun InlineVideo(
+    url: String,
+    authToken: String?,
+    aspectRatio: Float?,
+    modifier: Modifier = Modifier,
+)
 
 /** Shared fallback: a tappable card that opens the video in the browser (session-authenticated). */
 @Composable

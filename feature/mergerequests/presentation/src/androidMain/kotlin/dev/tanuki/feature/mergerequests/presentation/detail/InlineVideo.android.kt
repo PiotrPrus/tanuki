@@ -1,14 +1,17 @@
 package dev.tanuki.feature.mergerequests.presentation.detail
 
 import androidx.annotation.OptIn
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -24,12 +27,11 @@ import androidx.media3.ui.PlayerView
 
 @OptIn(UnstableApi::class)
 @Composable
-actual fun InlineVideo(url: String, authToken: String?, modifier: Modifier) {
+actual fun InlineVideo(url: String, authToken: String?, aspectRatio: Float?, modifier: Modifier) {
     var failed by remember(url) { mutableStateOf(false) }
 
     if (failed) {
-        // Private GitLab uploads are session-authenticated only — fall back to the browser.
-        VideoFallback(url = stripAccessToken(url), modifier = modifier)
+        VideoFallback(url = url, modifier = modifier)
         return
     }
 
@@ -56,11 +58,17 @@ actual fun InlineVideo(url: String, authToken: String?, modifier: Modifier) {
     DisposableEffect(player) {
         onDispose { player.release() }
     }
-    AndroidView(
-        factory = { ctx -> PlayerView(ctx).apply { this.player = player } },
-        modifier = modifier.fillMaxWidth().height(220.dp),
-    )
-}
 
-private fun stripAccessToken(url: String): String =
-    url.replace(Regex("""[?&]access_token=[^&]*"""), "")
+    // Portrait clips (aspect < 1) get a tall, centered frame; landscape fills width.
+    val frame = when {
+        aspectRatio == null -> Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+        aspectRatio < 1f -> Modifier.height(460.dp).aspectRatio(aspectRatio)
+        else -> Modifier.fillMaxWidth().aspectRatio(aspectRatio)
+    }
+    Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        AndroidView(
+            factory = { ctx -> PlayerView(ctx).apply { this.player = player } },
+            modifier = frame,
+        )
+    }
+}

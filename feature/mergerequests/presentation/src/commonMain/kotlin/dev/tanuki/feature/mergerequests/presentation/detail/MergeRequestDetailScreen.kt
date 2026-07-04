@@ -336,6 +336,7 @@ private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: 
             Description(
                 markdown = desc,
                 projectBaseUrl = mr.webUrl.substringBefore("/-/"),
+                projectId = mr.projectId,
                 authToken = authToken,
             )
         }
@@ -343,10 +344,10 @@ private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: 
 }
 
 @Composable
-private fun Description(markdown: String, projectBaseUrl: String, authToken: String?) {
+private fun Description(markdown: String, projectBaseUrl: String, projectId: Long, authToken: String?) {
     var expanded by rememberSaveable { mutableStateOf(false) }
-    val prepared = remember(markdown, projectBaseUrl, authToken) {
-        prepareMarkdown(markdown, projectBaseUrl, authToken)
+    val prepared = remember(markdown, projectBaseUrl, projectId) {
+        prepareMarkdown(markdown, projectBaseUrl, projectId)
     }
     val collapsible = prepared.markdown.length > 400
 
@@ -371,51 +372,66 @@ private fun Description(markdown: String, projectBaseUrl: String, authToken: Str
             Text(if (expanded) "Show less" else "Show more")
         }
     }
-    prepared.videoUrls.forEach { url ->
-        InlineVideo(url = url, authToken = authToken, modifier = Modifier.padding(top = 12.dp))
+    prepared.videos.forEach { video ->
+        InlineVideo(
+            url = video.url,
+            authToken = authToken,
+            aspectRatio = video.aspectRatio,
+            modifier = Modifier.padding(top = 12.dp),
+        )
     }
 }
 
+// Video embed with optional GitLab `{width=274 height=600}` sizing attrs.
+private val VIDEO_EMBED = Regex(
+    """!\[[^\]]*]\(([^)\s]+\.(?:mov|mp4|webm|m4v|avi))\)(?:\{([^}\n]*)\})?""",
+    RegexOption.IGNORE_CASE,
+)
+private val IMAGE_UPLOAD = Regex("""(!\[[^\]]*]\()([^)\s]*/uploads/[^)\s]*)(\))""")
 private val RELATIVE_URL = Regex("""]\((/[^)\s]*)\)""")
-private val VIDEO_EMBED =
-    Regex("""!\[([^\]]*)]\(([^)\s]+\.(?:mov|mp4|webm|m4v|avi))\)""", RegexOption.IGNORE_CASE)
-// GitLab appends sizing attributes like `){width=274 height=600}` — not standard Markdown.
 private val MEDIA_ATTRS = Regex("""(\))\{[^}\n]*\}""")
-private val UPLOAD_URL = Regex("""]\((https?://[^)\s]*/uploads/[^)\s]*)\)""")
+private val UPLOAD_PATH = Regex("""/uploads/([^/]+)/([^)\s?#]+)""")
+private val HOST = Regex("""^https?://[^/]+""")
+private val WIDTH = Regex("""width=(\d+)""")
+private val HEIGHT = Regex("""height=(\d+)""")
 
-private data class PreparedDescription(val markdown: String, val videoUrls: List<String>)
+private data class VideoRef(val url: String, val aspectRatio: Float?)
+private data class PreparedDescription(val markdown: String, val videos: List<VideoRef>)
 
 /**
- * Prepare a GitLab description for rendering:
- * 1. resolve root-relative `/uploads` URLs to absolute,
- * 2. strip `{width= height=}` media attrs,
- * 3. authenticate upload URLs with `?access_token=` (GitLab's web routes don't honor the
- *    OAuth bearer header — they take the token as a query param),
- * 4. pull video embeds out so they render as inline players.
+ * Prepare a GitLab description for rendering. Upload URLs are rewritten to the authenticated
+ * API form (`/api/v4/projects/:id/uploads/:secret/:file`) — the web `/uploads/` route is
+ * session-only, but the API route accepts our OAuth token. Video embeds are pulled out to
+ * render as inline players, carrying any width/height so vertical clips get a portrait frame.
  */
 private fun prepareMarkdown(
     markdown: String,
     projectBaseUrl: String,
-    accessToken: String?,
+    projectId: Long,
 ): PreparedDescription {
-    val absolute = RELATIVE_URL.replace(markdown) { m -> "](${projectBaseUrl}${m.groupValues[1]})" }
-    val noAttrs = MEDIA_ATTRS.replace(absolute) { m -> m.groupValues[1] }
-    val videos = mutableListOf<String>()
-    val withoutVideos = VIDEO_EMBED.replace(noAttrs) { m ->
-        videos += authenticateUpload(m.groupValues[2], accessToken)
+    val host = HOST.find(projectBaseUrl)?.value ?: projectBaseUrl
+    val videos = mutableListOf<VideoRef>()
+
+    var md = VIDEO_EMBED.replace(markdown) { m ->
+        val attrs = m.groupValues[2]
+        val w = WIDTH.find(attrs)?.groupValues?.get(1)?.toFloatOrNull()
+        val h = HEIGHT.find(attrs)?.groupValues?.get(1)?.toFloatOrNull()
+        val aspect = if (w != null && h != null && h > 0f) w / h else null
+        videos += VideoRef(toApiUploadUrl(m.groupValues[1], host, projectId), aspect)
         ""
     }
-    // Authenticate remaining upload URLs (inline images) so Coil can load them.
-    val authenticated = UPLOAD_URL.replace(withoutVideos) { m ->
-        "](${authenticateUpload(m.groupValues[1], accessToken)})"
+    md = IMAGE_UPLOAD.replace(md) { m ->
+        "${m.groupValues[1]}${toApiUploadUrl(m.groupValues[2], host, projectId)}${m.groupValues[3]}"
     }
-    return PreparedDescription(markdown = authenticated.trim(), videoUrls = videos)
+    md = RELATIVE_URL.replace(md) { m -> "](${projectBaseUrl}${m.groupValues[1]})" }
+    md = MEDIA_ATTRS.replace(md) { m -> m.groupValues[1] }
+    return PreparedDescription(markdown = md.trim(), videos = videos)
 }
 
-private fun authenticateUpload(url: String, accessToken: String?): String {
-    if (accessToken == null || "/uploads/" !in url || "access_token=" in url) return url
-    val separator = if ('?' in url) '&' else '?'
-    return "$url${separator}access_token=$accessToken"
+/** Rewrite a `/uploads/:secret/:file` URL (relative or absolute) to the token-authenticated API path. */
+private fun toApiUploadUrl(url: String, host: String, projectId: Long): String {
+    val m = UPLOAD_PATH.find(url) ?: return url
+    return "$host/api/v4/projects/$projectId/uploads/${m.groupValues[1]}/${m.groupValues[2]}"
 }
 
 @Composable
