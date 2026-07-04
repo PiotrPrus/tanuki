@@ -4,28 +4,40 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -89,98 +101,176 @@ fun MergeRequestDetailScreen(
     onBack: () -> Unit,
     snackbarHostState: SnackbarHostState,
 ) {
-    Column(modifier = Modifier.fillMaxSize().imePadding()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onBack) { Text("‹ Back") }
-            Spacer(Modifier.weight(1f))
-            if (state.mergeRequest != null) {
-                TextButton(onClick = { onAction(MergeRequestDetailAction.OnOpenInBrowser) }) {
-                    Text("Open in GitLab")
-                }
-            }
-        }
+    var showReviewSheet by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
 
-        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            when {
-                state.isLoading -> Box(Modifier.fillMaxSize(), Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-                state.error != null -> Box(Modifier.fillMaxSize(), Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(state.error.asString(), color = MaterialTheme.colorScheme.error)
-                        TextButton(onClick = { onAction(MergeRequestDetailAction.OnRetry) }) { Text("Retry") }
-                    }
-                }
-                else -> LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
-                    state.mergeRequest?.let { mr ->
-                        item { Header(mr, state.totalAdditions, state.totalDeletions, state.diffs.size) }
-                    }
-                    items(
-                        count = state.diffs.size,
-                        key = { index -> state.diffs[index].newPath + index },
-                    ) { index ->
-                        FileDiffView(state.diffs[index])
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = onBack) { Text("‹ Back") }
+                Spacer(Modifier.weight(1f))
+                if (state.mergeRequest != null) {
+                    TextButton(onClick = { onAction(MergeRequestDetailAction.OnOpenInBrowser) }) {
+                        Text("Open in GitLab")
                     }
                 }
             }
-            SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                when {
+                    state.isLoading -> Box(Modifier.fillMaxSize(), Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                    state.error != null -> Box(Modifier.fillMaxSize(), Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(state.error.asString(), color = MaterialTheme.colorScheme.error)
+                            TextButton(onClick = { onAction(MergeRequestDetailAction.OnRetry) }) { Text("Retry") }
+                        }
+                    }
+                    else -> {
+                        LazyColumn(
+                            state = listState,
+                            contentPadding = PaddingValues(bottom = 96.dp),
+                        ) {
+                            state.mergeRequest?.let { mr ->
+                                item { Header(mr, state.totalAdditions, state.totalDeletions, state.diffs.size) }
+                            }
+                            items(
+                                count = state.diffs.size,
+                                key = { index -> state.diffs[index].newPath + index },
+                            ) { index ->
+                                FileDiffView(state.diffs[index])
+                            }
+                        }
+                        DiffScrollbar(listState, Modifier.align(Alignment.CenterEnd))
+                    }
+                }
+                SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+            }
         }
 
         if (state.mergeRequest != null && state.error == null) {
-            ActionBar(state = state, onAction = onAction)
+            ExtendedFloatingActionButton(
+                onClick = { showReviewSheet = true },
+                icon = { Text("✓") },
+                text = { Text("Review") },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+            )
+        }
+    }
+
+    if (showReviewSheet && state.mergeRequest != null) {
+        ReviewSheet(
+            state = state,
+            onAction = onAction,
+            onDismiss = { showReviewSheet = false },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReviewSheet(
+    state: MergeRequestDetailState,
+    onAction: (MergeRequestDetailAction) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 24.dp)
+                .imePadding(),
+        ) {
+            Text("Review", style = MaterialTheme.typography.titleMedium)
+
+            OutlinedTextField(
+                value = state.commentText,
+                onValueChange = { onAction(MergeRequestDetailAction.OnCommentChange(it)) },
+                label = { Text("Leave a comment / request changes") },
+                enabled = !state.actionInProgress,
+                minLines = 2,
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            )
+            Button(
+                onClick = {
+                    onAction(MergeRequestDetailAction.OnSendComment)
+                    onDismiss()
+                },
+                enabled = state.commentText.isNotBlank() && !state.actionInProgress,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            ) {
+                Text("Comment")
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+            Button(
+                onClick = {
+                    onAction(MergeRequestDetailAction.OnApprove)
+                    onDismiss()
+                },
+                enabled = !state.approved && !state.actionInProgress,
+                colors = ButtonDefaults.buttonColors(containerColor = TanukiTheme.colors.success),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (state.approved) "Approved ✓" else "Approve")
+            }
+            Button(
+                onClick = {
+                    onAction(MergeRequestDetailAction.OnMerge)
+                    onDismiss()
+                },
+                enabled = !state.actionInProgress,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            ) {
+                Text("Merge")
+            }
         }
     }
 }
 
+/**
+ * A lightweight scroll-position thumb on the right edge. Item-index based, so it's
+ * approximate across wildly different file sizes, but gives a clear sense of position.
+ */
 @Composable
-private fun ActionBar(
-    state: MergeRequestDetailState,
-    onAction: (MergeRequestDetailAction) -> Unit,
-) {
-    Surface(tonalElevation = 3.dp, color = MaterialTheme.colorScheme.surfaceContainer) {
-        Column(Modifier.fillMaxWidth().padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = state.commentText,
-                    onValueChange = { onAction(MergeRequestDetailAction.OnCommentChange(it)) },
-                    placeholder = { Text("Add a comment") },
-                    singleLine = true,
-                    enabled = !state.actionInProgress,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.width(8.dp))
-                Button(
-                    onClick = { onAction(MergeRequestDetailAction.OnSendComment) },
-                    enabled = state.commentText.isNotBlank() && !state.actionInProgress,
-                ) {
-                    Text("Send")
-                }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Button(
-                    onClick = { onAction(MergeRequestDetailAction.OnApprove) },
-                    enabled = !state.approved && !state.actionInProgress,
-                    colors = ButtonDefaults.buttonColors(containerColor = TanukiTheme.colors.success),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(if (state.approved) "Approved ✓" else "Approve")
-                }
-                Button(
-                    onClick = { onAction(MergeRequestDetailAction.OnMerge) },
-                    enabled = !state.actionInProgress,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("Merge")
-                }
-            }
+private fun DiffScrollbar(listState: LazyListState, modifier: Modifier = Modifier) {
+    val visible by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            info.totalItemsCount > info.visibleItemsInfo.size && info.totalItemsCount > 0
         }
+    }
+    if (!visible) return
+
+    val info = listState.layoutInfo
+    val total = info.totalItemsCount
+    val visibleCount = info.visibleItemsInfo.size.coerceAtLeast(1)
+    val proportion = (visibleCount.toFloat() / total).coerceIn(0.06f, 1f)
+    val progress = (listState.firstVisibleItemIndex.toFloat() / (total - visibleCount).coerceAtLeast(1))
+        .coerceIn(0f, 1f)
+
+    BoxWithConstraints(
+        modifier = modifier.fillMaxHeight().padding(vertical = 4.dp).width(4.dp),
+    ) {
+        val trackHeight = maxHeight
+        val thumbHeight = trackHeight * proportion
+        val offsetY = (trackHeight - thumbHeight) * progress
+        Box(
+            modifier = Modifier
+                .offset(y = offsetY)
+                .height(thumbHeight)
+                .width(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
+        )
     }
 }
 
@@ -238,7 +328,7 @@ private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: 
 
 @Composable
 private fun Description(text: String) {
-    // TODO(#markdown): render as Markdown (images/video/formatting) — tracked in GitHub issues.
+    // TODO(#6/#7): render as Markdown + inline images/video.
     var expanded by rememberSaveable { mutableStateOf(false) }
     var overflowing by remember { mutableStateOf(false) }
     Text(
@@ -281,8 +371,6 @@ private fun StatusPill(status: MergeStatus) {
         )
     }
 }
-
-private const val COLLAPSED_DESCRIPTION_LINES = 6
 
 @Composable
 private fun FileDiffView(file: FileDiff) {
@@ -399,3 +487,5 @@ private fun DiffLineRow(line: DiffLine) {
         )
     }
 }
+
+private const val COLLAPSED_DESCRIPTION_LINES = 6
