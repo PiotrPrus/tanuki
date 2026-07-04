@@ -2,6 +2,7 @@ package dev.tanuki.feature.mergerequests.presentation.detail
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.tanuki.core.domain.auth.TokenStorage
 import dev.tanuki.core.domain.util.onFailure
 import dev.tanuki.core.domain.util.onSuccess
 import dev.tanuki.core.presentation.UiText
@@ -15,6 +16,7 @@ import kotlinx.coroutines.launch
 
 class MergeRequestDetailViewModel(
     private val repository: MergeRequestRepository,
+    private val tokenStorage: TokenStorage,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(MergeRequestDetailState())
@@ -101,6 +103,7 @@ class MergeRequestDetailViewModel(
     private fun reload() {
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
+            _state.update { it.copy(accessToken = tokenStorage.getTokens()?.accessToken) }
             repository.getMergeRequest(projectId, iid)
                 .onSuccess { mr -> _state.update { it.copy(mergeRequest = mr) } }
                 .onFailure {

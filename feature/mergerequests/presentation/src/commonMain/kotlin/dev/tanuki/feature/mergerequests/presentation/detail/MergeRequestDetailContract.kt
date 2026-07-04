@@ -14,6 +14,8 @@ data class MergeRequestDetailState(
     val isApproving: Boolean = false,
     val isMerging: Boolean = false,
     val isCommenting: Boolean = false,
+    /** Access token for authenticated media (video) streaming. */
+    val accessToken: String? = null,
 ) {
     val totalAdditions: Int get() = diffs.sumOf { it.additions }
     val totalDeletions: Int get() = diffs.sumOf { it.deletions }

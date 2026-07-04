@@ -140,7 +140,15 @@ fun MergeRequestDetailScreen(
                             contentPadding = PaddingValues(bottom = 96.dp),
                         ) {
                             state.mergeRequest?.let { mr ->
-                                item { Header(mr, state.totalAdditions, state.totalDeletions, state.diffs.size) }
+                                item {
+                                    Header(
+                                        mr = mr,
+                                        additions = state.totalAdditions,
+                                        deletions = state.totalDeletions,
+                                        fileCount = state.diffs.size,
+                                        authToken = state.accessToken,
+                                    )
+                                }
                             }
                             items(
                                 count = state.diffs.size,
@@ -279,7 +287,7 @@ private fun DiffScrollbar(listState: LazyListState, modifier: Modifier = Modifie
 }
 
 @Composable
-private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: Int) {
+private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: Int, authToken: String?) {
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
         Text(
             text = mr.title,
@@ -325,16 +333,20 @@ private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: 
             )
         }
         mr.description?.takeIf { it.isNotBlank() }?.let { desc ->
-            Description(desc, projectBaseUrl = mr.webUrl.substringBefore("/-/"))
+            Description(
+                markdown = desc,
+                projectBaseUrl = mr.webUrl.substringBefore("/-/"),
+                authToken = authToken,
+            )
         }
     }
 }
 
 @Composable
-private fun Description(markdown: String, projectBaseUrl: String) {
+private fun Description(markdown: String, projectBaseUrl: String, authToken: String?) {
     var expanded by rememberSaveable { mutableStateOf(false) }
-    val rendered = remember(markdown, projectBaseUrl) { prepareMarkdown(markdown, projectBaseUrl) }
-    val collapsible = markdown.length > 400
+    val prepared = remember(markdown, projectBaseUrl) { prepareMarkdown(markdown, projectBaseUrl) }
+    val collapsible = prepared.markdown.length > 400
 
     Box(
         modifier = Modifier
@@ -344,7 +356,7 @@ private fun Description(markdown: String, projectBaseUrl: String) {
             .clipToBounds(),
     ) {
         Markdown(
-            content = rendered,
+            content = prepared.markdown,
             imageTransformer = Coil3ImageTransformerImpl,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -357,22 +369,32 @@ private fun Description(markdown: String, projectBaseUrl: String) {
             Text(if (expanded) "Show less" else "Show more")
         }
     }
+    prepared.videoUrls.forEach { url ->
+        InlineVideo(url = url, authToken = authToken, modifier = Modifier.padding(top = 12.dp))
+    }
 }
 
 private val RELATIVE_URL = Regex("""]\((/[^)\s]*)\)""")
 private val VIDEO_EMBED =
     Regex("""!\[([^\]]*)]\(([^)\s]+\.(?:mov|mp4|webm|m4v|avi))\)""", RegexOption.IGNORE_CASE)
 // GitLab appends sizing attributes like `){width=274 height=600}` — not standard Markdown.
-private val MEDIA_ATTRS = Regex("""(\))\{[^}\n]*}""")
+private val MEDIA_ATTRS = Regex("""(\))\{[^}\n]*\}""")
 
-/** Resolve GitLab root-relative upload URLs to absolute, and turn video embeds into tappable links. */
-private fun prepareMarkdown(markdown: String, projectBaseUrl: String): String {
+private data class PreparedDescription(val markdown: String, val videoUrls: List<String>)
+
+/**
+ * Resolve GitLab root-relative upload URLs to absolute, strip media size attrs, and pull
+ * video embeds out of the Markdown so they can render as inline players.
+ */
+private fun prepareMarkdown(markdown: String, projectBaseUrl: String): PreparedDescription {
     val absolute = RELATIVE_URL.replace(markdown) { m -> "](${projectBaseUrl}${m.groupValues[1]})" }
     val noAttrs = MEDIA_ATTRS.replace(absolute) { m -> m.groupValues[1] }
-    return VIDEO_EMBED.replace(noAttrs) { m ->
-        val label = m.groupValues[1].ifBlank { "Video" }
-        "[▶ $label](${m.groupValues[2]})"
+    val videos = mutableListOf<String>()
+    val withoutVideos = VIDEO_EMBED.replace(noAttrs) { m ->
+        videos += m.groupValues[2]
+        ""
     }
+    return PreparedDescription(markdown = withoutVideos.trim(), videoUrls = videos)
 }
 
 @Composable
