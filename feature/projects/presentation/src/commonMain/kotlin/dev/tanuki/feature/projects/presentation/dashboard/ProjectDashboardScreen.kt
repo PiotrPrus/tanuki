@@ -59,6 +59,7 @@ fun ProjectDashboardRoot(
     projectName: String,
     onBack: () -> Unit,
     onOpenMergeRequests: (projectId: Long, projectName: String) -> Unit,
+    onOpenBranches: (projectId: Long, projectName: String) -> Unit,
     onOpenInBrowser: (url: String) -> Unit,
     viewModel: ProjectDashboardViewModel = koinViewModel(),
 ) {
@@ -70,6 +71,7 @@ fun ProjectDashboardRoot(
         onAction = viewModel::onAction,
         onBack = onBack,
         onOpenMergeRequests = { onOpenMergeRequests(projectId, projectName) },
+        onOpenBranches = { onOpenBranches(projectId, projectName) },
     )
 }
 
@@ -91,6 +93,7 @@ fun ProjectDashboardScreen(
     onAction: (ProjectDashboardAction) -> Unit,
     onBack: () -> Unit,
     onOpenMergeRequests: () -> Unit = {},
+    onOpenBranches: () -> Unit = {},
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -113,7 +116,7 @@ fun ProjectDashboardScreen(
                     TextButton(onClick = { onAction(ProjectDashboardAction.OnRetry) }) { Text("Retry") }
                 }
             }
-            state.detail != null -> DashboardContent(state.detail, state.stats, onOpenMergeRequests)
+            state.detail != null -> DashboardContent(state.detail, state.stats, onOpenMergeRequests, onOpenBranches)
         }
     }
 }
@@ -134,6 +137,7 @@ private fun DashboardContent(
     detail: ProjectDetail,
     stats: ProjectStats?,
     onOpenMergeRequests: () -> Unit,
+    onOpenBranches: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -189,7 +193,12 @@ private fun DashboardContent(
             BentoTile("Tags", Icons.Filled.Label, stats?.latestTag ?: stats?.tags?.let { "$it total" } ?: "Latest"),
             BentoTile("Releases", Icons.Filled.RocketLaunch, stats?.releases?.let { "$it total" } ?: "View"),
             BentoTile("Pipelines", Icons.Filled.CheckCircle, pipelineLabel, tone = pipelineTone),
-            BentoTile("Branches", Icons.Filled.AltRoute, stats?.branches?.let { "$it Active" } ?: "View"),
+            BentoTile(
+                "Branches",
+                Icons.Filled.AltRoute,
+                stats?.branches?.let { "$it Active" } ?: "View",
+                onClick = onOpenBranches,
+            ),
         )
         Column(
             modifier = Modifier.padding(top = 24.dp),

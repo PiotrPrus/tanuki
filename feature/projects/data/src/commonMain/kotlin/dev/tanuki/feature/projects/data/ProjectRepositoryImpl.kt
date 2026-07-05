@@ -6,13 +6,17 @@ import dev.tanuki.core.domain.util.DataError
 import dev.tanuki.core.domain.util.Result
 import dev.tanuki.core.domain.util.map
 import dev.tanuki.core.domain.util.onSuccess
+import dev.tanuki.feature.projects.data.dto.BranchDto
+import dev.tanuki.feature.projects.data.dto.BranchMrRefDto
 import dev.tanuki.feature.projects.data.dto.CommitDto
 import dev.tanuki.feature.projects.data.dto.PipelineDto
 import dev.tanuki.feature.projects.data.dto.ProjectDetailDto
 import dev.tanuki.feature.projects.data.dto.ProjectDto
 import dev.tanuki.feature.projects.data.dto.TagDto
+import dev.tanuki.feature.projects.data.dto.toBranch
 import dev.tanuki.feature.projects.data.dto.toProject
 import dev.tanuki.feature.projects.data.dto.toProjectDetail
+import dev.tanuki.feature.projects.domain.Branch
 import dev.tanuki.feature.projects.domain.PipelineStatus
 import dev.tanuki.feature.projects.domain.Project
 import dev.tanuki.feature.projects.domain.ProjectDetail
@@ -117,6 +121,33 @@ class ProjectRepositoryImpl(
             commitActivity = activity.await(),
         )
     }
+
+    override suspend fun getBranches(projectId: Long): Result<List<Branch>, DataError.Remote> =
+        coroutineScope {
+            val base = "projects/$projectId"
+            val branchesDeferred = async {
+                safeCall<List<BranchDto>> {
+                    httpClient.get("$base/repository/branches") { parameter("per_page", 100) }
+                }
+            }
+            // Tag each branch with its open MR, if any (best-effort — failures leave branches untagged).
+            val mrRefsDeferred = async {
+                safeCall<List<BranchMrRefDto>> {
+                    httpClient.get("$base/merge_requests") {
+                        parameter("state", "opened")
+                        parameter("per_page", 100)
+                    }
+                }
+            }
+
+            var mrByBranch: Map<String, Long> = emptyMap()
+            mrRefsDeferred.await().onSuccess { refs ->
+                mrByBranch = refs.associate { it.sourceBranch to it.iid }
+            }
+            branchesDeferred.await().map { dtos ->
+                dtos.map { it.toBranch(mrByBranch[it.name]) }
+            }
+        }
 
     /**
      * Daily commit counts on [ref] over the last [ACTIVITY_WINDOW_DAYS], oldest bucket first.

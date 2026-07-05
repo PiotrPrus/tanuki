@@ -12,4 +12,7 @@ interface ProjectRepository {
 
     /** Best-effort dashboard counts/status (parallel calls; nulls where unavailable). */
     suspend fun getProjectStats(projectId: Long, defaultBranch: String?): ProjectStats
+
+    /** Repository branches, annotated with any open merge request sourced from each. */
+    suspend fun getBranches(projectId: Long): Result<List<Branch>, DataError.Remote>
 }
