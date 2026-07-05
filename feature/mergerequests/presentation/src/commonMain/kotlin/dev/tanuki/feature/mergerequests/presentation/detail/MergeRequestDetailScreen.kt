@@ -705,7 +705,6 @@ private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: 
 
 @Composable
 private fun Description(markdown: String, projectBaseUrl: String, projectId: Long, authToken: String?) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
     val blocks = remember(markdown, projectBaseUrl, projectId) {
         prepareDescription(markdown, projectBaseUrl, projectId)
     }
@@ -720,45 +719,22 @@ private fun Description(markdown: String, projectBaseUrl: String, projectId: Lon
         h6 = MaterialTheme.typography.bodyMedium,
     )
 
-    Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .clickable { expanded = !expanded }
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = if (expanded) "▾" else "▸",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.width(18.dp),
-            )
-            Text(
-                text = "Description",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-        if (expanded) {
-            Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                blocks.forEach { block ->
-                    when (block) {
-                        is DescriptionBlock.Md -> Markdown(
-                            content = block.markdown,
-                            imageTransformer = Coil3ImageTransformerImpl,
-                            typography = typography,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        is DescriptionBlock.Video -> InlineVideo(
-                            url = block.url,
-                            authToken = authToken,
-                            aspectRatio = block.aspectRatio,
-                            modifier = Modifier.padding(vertical = 8.dp),
-                        )
-                    }
-                }
+    // Always expanded now that Overview is its own tab.
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+        blocks.forEach { block ->
+            when (block) {
+                is DescriptionBlock.Md -> Markdown(
+                    content = block.markdown,
+                    imageTransformer = Coil3ImageTransformerImpl,
+                    typography = typography,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                is DescriptionBlock.Video -> InlineVideo(
+                    url = block.url,
+                    authToken = authToken,
+                    aspectRatio = block.aspectRatio,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
             }
         }
     }
