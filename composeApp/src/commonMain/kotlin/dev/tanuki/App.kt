@@ -9,6 +9,10 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.MergeType
+import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -281,16 +285,16 @@ private fun NavDestination?.isTopLevel(): Boolean =
 private fun TanukiBottomBar(navController: NavHostController, destination: NavDestination?) {
     NavigationBar {
         NavigationBarItem(
-            selected = destination?.hasRoute<Routes.Projects>() == true,
-            onClick = { navController.switchTab(Routes.Projects) },
-            icon = { Text("📁") },
-            label = { Text("Projects") },
-        )
-        NavigationBarItem(
             selected = destination?.hasRoute<Routes.Reviews>() == true,
             onClick = { navController.switchTab(Routes.Reviews) },
-            icon = { Text("🔀") },
+            icon = { Icon(Icons.Filled.MergeType, contentDescription = null) },
             label = { Text("Reviews") },
+        )
+        NavigationBarItem(
+            selected = destination?.hasRoute<Routes.Projects>() == true,
+            onClick = { navController.switchTab(Routes.Projects) },
+            icon = { Icon(Icons.Filled.Folder, contentDescription = null) },
+            label = { Text("Projects") },
         )
     }
 }
