@@ -24,6 +24,12 @@ sealed interface Routes {
     @Serializable
     data class ProjectReleases(val projectId: Long, val projectName: String) : Routes
 
+    @Serializable
+    data class ProjectPipelines(val projectId: Long, val projectName: String) : Routes
+
+    @Serializable
+    data class PipelineDetail(val projectId: Long, val pipelineId: Long, val title: String) : Routes
+
     /** Tag/release detail: [ref] is the tag; [fromRef] is the previous tag to diff against (null = oldest). */
     @Serializable
     data class RefDetail(

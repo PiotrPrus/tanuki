@@ -13,7 +13,9 @@ import dev.tanuki.feature.projects.data.dto.BranchMrRefDto
 import dev.tanuki.feature.projects.data.dto.CompareDto
 import dev.tanuki.feature.projects.data.dto.CurrentUserDto
 import dev.tanuki.feature.projects.data.dto.CommitDto
+import dev.tanuki.feature.projects.data.dto.JobDto
 import dev.tanuki.feature.projects.data.dto.PipelineDto
+import dev.tanuki.feature.projects.data.dto.PipelineListItemDto
 import dev.tanuki.feature.projects.data.dto.ProjectDetailDto
 import dev.tanuki.feature.projects.data.dto.ProjectDto
 import dev.tanuki.feature.projects.data.dto.ReleaseDto
@@ -21,9 +23,13 @@ import dev.tanuki.feature.projects.data.dto.TagDto
 import dev.tanuki.feature.projects.data.dto.toBranch
 import dev.tanuki.feature.projects.data.dto.toProject
 import dev.tanuki.feature.projects.data.dto.toProjectDetail
+import dev.tanuki.feature.projects.data.dto.toPipeline
+import dev.tanuki.feature.projects.data.dto.toPipelineJob
 import dev.tanuki.feature.projects.data.dto.toRelease
 import dev.tanuki.feature.projects.data.dto.toTag
 import dev.tanuki.feature.projects.domain.Branch
+import dev.tanuki.feature.projects.domain.Pipeline
+import dev.tanuki.feature.projects.domain.PipelineJob
 import dev.tanuki.feature.projects.domain.PipelineStatus
 import dev.tanuki.feature.projects.domain.Project
 import dev.tanuki.feature.projects.domain.Release
@@ -223,6 +229,19 @@ class ProjectRepositoryImpl(
                 parameter("to", to)
             }
         }.map { dto -> dto.diffs.map { it.toFileDiff() } }
+
+    override suspend fun getPipelines(projectId: Long): Result<List<Pipeline>, DataError.Remote> =
+        safeCall<List<PipelineListItemDto>> {
+            httpClient.get("projects/$projectId/pipelines") { parameter("per_page", 30) }
+        }.map { dtos -> dtos.map { it.toPipeline() } }
+
+    override suspend fun getPipelineJobs(
+        projectId: Long,
+        pipelineId: Long,
+    ): Result<List<PipelineJob>, DataError.Remote> =
+        safeCall<List<JobDto>> {
+            httpClient.get("projects/$projectId/pipelines/$pipelineId/jobs") { parameter("per_page", 100) }
+        }.map { dtos -> dtos.map { it.toPipelineJob() } }
 
     /**
      * Daily commit counts on [ref] over the last [ACTIVITY_WINDOW_DAYS], oldest bucket first.

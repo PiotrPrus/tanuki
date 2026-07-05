@@ -41,6 +41,8 @@ import dev.tanuki.feature.mergerequests.presentation.projectlist.ProjectMergeReq
 import dev.tanuki.feature.projects.presentation.ProjectsRoot
 import dev.tanuki.feature.projects.presentation.branches.ProjectBranchesRoot
 import dev.tanuki.feature.projects.presentation.dashboard.ProjectDashboardRoot
+import dev.tanuki.feature.projects.presentation.pipelines.PipelineDetailRoot
+import dev.tanuki.feature.projects.presentation.pipelines.ProjectPipelinesRoot
 import dev.tanuki.feature.projects.presentation.refdetail.RefDetailRoot
 import dev.tanuki.feature.projects.presentation.releases.ProjectReleasesRoot
 import dev.tanuki.feature.projects.presentation.tags.ProjectTagsRoot
@@ -135,6 +137,30 @@ private fun AppScaffold(startLoggedIn: Boolean) {
                     onOpenReleases = { projectId, projectName ->
                         navController.navigate(Routes.ProjectReleases(projectId, projectName))
                     },
+                    onOpenPipelines = { projectId, projectName ->
+                        navController.navigate(Routes.ProjectPipelines(projectId, projectName))
+                    },
+                    onOpenInBrowser = { url -> uriHandler.openUri(url) },
+                )
+            }
+            composable<Routes.ProjectPipelines> { entry ->
+                val route = entry.toRoute<Routes.ProjectPipelines>()
+                ProjectPipelinesRoot(
+                    projectId = route.projectId,
+                    projectName = route.projectName,
+                    onBack = { navController.popBackStack() },
+                    onOpenPipeline = { pipelineId, ref ->
+                        navController.navigate(Routes.PipelineDetail(route.projectId, pipelineId, ref))
+                    },
+                )
+            }
+            composable<Routes.PipelineDetail> { entry ->
+                val route = entry.toRoute<Routes.PipelineDetail>()
+                PipelineDetailRoot(
+                    projectId = route.projectId,
+                    pipelineId = route.pipelineId,
+                    title = "${route.title} · #${route.pipelineId}",
+                    onBack = { navController.popBackStack() },
                     onOpenInBrowser = { url -> uriHandler.openUri(url) },
                 )
             }

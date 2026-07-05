@@ -31,4 +31,10 @@ interface ProjectRepository {
 
     /** Diff of everything between refs [from] and [to] (branches/tags/shas). */
     suspend fun compareRefs(projectId: Long, from: String, to: String): Result<List<FileDiff>, DataError.Remote>
+
+    /** Recent CI pipelines, newest first. */
+    suspend fun getPipelines(projectId: Long): Result<List<Pipeline>, DataError.Remote>
+
+    /** Jobs of a single pipeline (for the stage breakdown). */
+    suspend fun getPipelineJobs(projectId: Long, pipelineId: Long): Result<List<PipelineJob>, DataError.Remote>
 }
