@@ -8,6 +8,12 @@ interface MergeRequestRepository {
     suspend fun getReviewRequested(): Result<List<MergeRequest>, DataError.Remote>
     suspend fun getAssignedToMe(): Result<List<MergeRequest>, DataError.Remote>
 
+    /** All merge requests in a single project, filtered by lifecycle [filter], newest first. */
+    suspend fun getProjectMergeRequests(
+        projectId: Long,
+        filter: MergeRequestFilter,
+    ): Result<List<MergeRequest>, DataError.Remote>
+
     suspend fun getMergeRequest(projectId: Long, iid: Long): Result<MergeRequest, DataError.Remote>
     suspend fun getDiffs(projectId: Long, iid: Long): Result<List<FileDiff>, DataError.Remote>
 

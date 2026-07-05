@@ -12,6 +12,7 @@ import dev.tanuki.feature.mergerequests.data.dto.toFileDiff
 import dev.tanuki.feature.mergerequests.data.mapper.toMergeRequest
 import dev.tanuki.feature.mergerequests.domain.FileDiff
 import dev.tanuki.feature.mergerequests.domain.MergeRequest
+import dev.tanuki.feature.mergerequests.domain.MergeRequestFilter
 import dev.tanuki.feature.mergerequests.domain.MergeRequestRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
@@ -26,6 +27,19 @@ class MergeRequestRepositoryImpl(
     override suspend fun getReviewRequested() = fetch(scope = "reviews_for_me")
 
     override suspend fun getAssignedToMe() = fetch(scope = "assigned_to_me")
+
+    override suspend fun getProjectMergeRequests(
+        projectId: Long,
+        filter: MergeRequestFilter,
+    ): Result<List<MergeRequest>, DataError.Remote> =
+        safeCall<List<MergeRequestDto>> {
+            httpClient.get("projects/$projectId/merge_requests") {
+                parameter("state", filter.apiValue)
+                parameter("order_by", "updated_at")
+                parameter("sort", "desc")
+                parameter("per_page", 30)
+            }
+        }.map { dtos -> dtos.map { it.toMergeRequest() } }
 
     override suspend fun getMergeRequest(
         projectId: Long,

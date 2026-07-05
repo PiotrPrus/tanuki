@@ -2,6 +2,7 @@ package dev.tanuki.feature.mergerequests.data.mapper
 
 import dev.tanuki.feature.mergerequests.data.dto.MergeRequestDto
 import dev.tanuki.feature.mergerequests.domain.MergeRequest
+import dev.tanuki.feature.mergerequests.domain.MergeRequestState
 import dev.tanuki.feature.mergerequests.domain.MergeStatus
 import kotlin.time.Instant
 
@@ -17,6 +18,12 @@ fun MergeRequestDto.toMergeRequest(): MergeRequest = MergeRequest(
     reference = references?.full ?: "!$iid",
     webUrl = webUrl,
     description = description,
+    state = when (state) {
+        "opened" -> MergeRequestState.OPEN
+        "merged" -> MergeRequestState.MERGED
+        "closed" -> MergeRequestState.CLOSED
+        else -> MergeRequestState.UNKNOWN
+    },
     status = detailedMergeStatus.toMergeStatus(isDraft = draft, hasConflicts = hasConflicts),
     isDraft = draft,
     hasConflicts = hasConflicts,

@@ -3,6 +3,7 @@ package dev.tanuki.feature.projects.presentation.dashboard
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +39,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -56,13 +58,19 @@ fun ProjectDashboardRoot(
     projectId: Long,
     projectName: String,
     onBack: () -> Unit,
+    onOpenMergeRequests: (projectId: Long, projectName: String) -> Unit,
     onOpenInBrowser: (url: String) -> Unit,
     viewModel: ProjectDashboardViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(projectId) { viewModel.load(projectId) }
     ObserveDashboardEvents(viewModel, onOpenInBrowser)
-    ProjectDashboardScreen(state = state, onAction = viewModel::onAction, onBack = onBack)
+    ProjectDashboardScreen(
+        state = state,
+        onAction = viewModel::onAction,
+        onBack = onBack,
+        onOpenMergeRequests = { onOpenMergeRequests(projectId, projectName) },
+    )
 }
 
 @Composable
@@ -82,6 +90,7 @@ fun ProjectDashboardScreen(
     state: ProjectDashboardState,
     onAction: (ProjectDashboardAction) -> Unit,
     onBack: () -> Unit,
+    onOpenMergeRequests: () -> Unit = {},
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -104,7 +113,7 @@ fun ProjectDashboardScreen(
                     TextButton(onClick = { onAction(ProjectDashboardAction.OnRetry) }) { Text("Retry") }
                 }
             }
-            state.detail != null -> DashboardContent(state.detail, state.stats)
+            state.detail != null -> DashboardContent(state.detail, state.stats, onOpenMergeRequests)
         }
     }
 }
@@ -117,10 +126,15 @@ private data class BentoTile(
     val subtitle: String,
     val featured: Boolean = false,
     val tone: Tone = Tone.MUTED,
+    val onClick: (() -> Unit)? = null,
 )
 
 @Composable
-private fun DashboardContent(detail: ProjectDetail, stats: ProjectStats?) {
+private fun DashboardContent(
+    detail: ProjectDetail,
+    stats: ProjectStats?,
+    onOpenMergeRequests: () -> Unit,
+) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
     ) {
@@ -169,6 +183,7 @@ private fun DashboardContent(detail: ProjectDetail, stats: ProjectStats?) {
                 stats?.openMergeRequests?.let { "$it Open" } ?: "Open",
                 featured = true,
                 tone = Tone.PRIMARY,
+                onClick = onOpenMergeRequests,
             ),
             BentoTile("Code", Icons.Filled.Folder, codeSubtitle),
             BentoTile("Tags", Icons.Filled.Label, stats?.latestTag ?: stats?.tags?.let { "$it total" } ?: "Latest"),
@@ -205,11 +220,13 @@ private fun BentoCard(tile: BentoTile, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .aspectRatio(1f)
+            .clip(RoundedCornerShape(16.dp))
             .border(
                 BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 RoundedCornerShape(16.dp),
             )
             .background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(16.dp))
+            .then(if (tile.onClick != null) Modifier.clickable(onClick = tile.onClick) else Modifier)
             .padding(16.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {

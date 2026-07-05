@@ -37,6 +37,7 @@ import dev.tanuki.feature.auth.domain.AuthRepository
 import dev.tanuki.feature.auth.presentation.LoginRoot
 import dev.tanuki.feature.mergerequests.presentation.MergeRequestsRoot
 import dev.tanuki.feature.mergerequests.presentation.detail.MergeRequestDetailRoot
+import dev.tanuki.feature.mergerequests.presentation.projectlist.ProjectMergeRequestsRoot
 import dev.tanuki.feature.projects.presentation.ProjectsRoot
 import dev.tanuki.feature.projects.presentation.dashboard.ProjectDashboardRoot
 import dev.tanuki.navigation.Routes
@@ -118,7 +119,21 @@ private fun AppScaffold(startLoggedIn: Boolean) {
                     projectId = route.projectId,
                     projectName = route.projectName,
                     onBack = { navController.popBackStack() },
+                    onOpenMergeRequests = { projectId, projectName ->
+                        navController.navigate(Routes.ProjectMergeRequests(projectId, projectName))
+                    },
                     onOpenInBrowser = { url -> uriHandler.openUri(url) },
+                )
+            }
+            composable<Routes.ProjectMergeRequests> { entry ->
+                val route = entry.toRoute<Routes.ProjectMergeRequests>()
+                ProjectMergeRequestsRoot(
+                    projectId = route.projectId,
+                    projectName = route.projectName,
+                    onBack = { navController.popBackStack() },
+                    onOpenMergeRequest = { projectId, iid ->
+                        navController.navigate(Routes.MergeRequestDetail(projectId, iid))
+                    },
                 )
             }
             composable<Routes.Reviews> {
