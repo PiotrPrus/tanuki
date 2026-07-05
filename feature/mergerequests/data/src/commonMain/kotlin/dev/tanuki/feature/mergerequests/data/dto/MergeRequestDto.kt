@@ -22,6 +22,14 @@ data class MergeRequestDto(
     @SerialName("updated_at") val updatedAt: String,
     val author: AuthorDto,
     val references: ReferencesDto? = null,
+    @SerialName("diff_refs") val diffRefs: DiffRefsDto? = null,
+)
+
+@Serializable
+data class DiffRefsDto(
+    @SerialName("base_sha") val baseSha: String? = null,
+    @SerialName("start_sha") val startSha: String? = null,
+    @SerialName("head_sha") val headSha: String? = null,
 )
 
 @Serializable

@@ -1,6 +1,7 @@
 package dev.tanuki.feature.mergerequests.data.mapper
 
 import dev.tanuki.feature.mergerequests.data.dto.MergeRequestDto
+import dev.tanuki.feature.mergerequests.domain.DiffRefs
 import dev.tanuki.feature.mergerequests.domain.MergeRequest
 import dev.tanuki.feature.mergerequests.domain.MergeRequestState
 import dev.tanuki.feature.mergerequests.domain.MergeStatus
@@ -30,6 +31,13 @@ fun MergeRequestDto.toMergeRequest(): MergeRequest = MergeRequest(
     hasUnresolvedDiscussions = !blockingDiscussionsResolved,
     commentCount = userNotesCount,
     updatedAt = runCatching { Instant.parse(updatedAt) }.getOrDefault(Instant.DISTANT_PAST),
+    diffRefs = diffRefs?.let { r ->
+        if (r.baseSha != null && r.startSha != null && r.headSha != null) {
+            DiffRefs(baseSha = r.baseSha, startSha = r.startSha, headSha = r.headSha)
+        } else {
+            null
+        }
+    },
 )
 
 private fun String?.toMergeStatus(isDraft: Boolean, hasConflicts: Boolean): MergeStatus = when {

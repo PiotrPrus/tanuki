@@ -1,7 +1,10 @@
 package dev.tanuki.core.designsystem
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -9,8 +12,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -33,9 +38,21 @@ import dev.tanuki.core.domain.diff.DiffLine
 import dev.tanuki.core.domain.diff.DiffLineType
 import dev.tanuki.core.domain.diff.FileDiff
 
-/** A collapsible file diff with red/green line highlighting. Reused across features. */
+/**
+ * A collapsible file diff with red/green line highlighting. Reused across features.
+ *
+ * Optional per-line hooks power MR review interactions: [onLineClick]/[onLineLongPress] fire for
+ * non-hunk lines, [isLineSelected] tints a line, and [lineHasComment] shows a thread indicator.
+ */
 @Composable
-fun FileDiffView(file: FileDiff, modifier: Modifier = Modifier) {
+fun FileDiffView(
+    file: FileDiff,
+    modifier: Modifier = Modifier,
+    onLineClick: ((DiffLine) -> Unit)? = null,
+    onLineLongPress: ((DiffLine) -> Unit)? = null,
+    isLineSelected: (DiffLine) -> Boolean = { false },
+    lineHasComment: (DiffLine) -> Boolean = { false },
+) {
     var expanded by rememberSaveable(file.newPath) { mutableStateOf(true) }
     val path = if (file.isDeleted) file.oldPath else file.newPath
     val name = path.substringAfterLast('/')
@@ -91,13 +108,28 @@ fun FileDiffView(file: FileDiff, modifier: Modifier = Modifier) {
             )
         }
         if (expanded) {
-            file.lines.forEach { DiffLineRow(it) }
+            file.lines.forEach { line ->
+                DiffLineRow(
+                    line = line,
+                    selected = isLineSelected(line),
+                    hasComment = lineHasComment(line),
+                    onClick = onLineClick?.let { cb -> { cb(line) } },
+                    onLongClick = onLineLongPress?.let { cb -> { cb(line) } },
+                )
+            }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun DiffLineRow(line: DiffLine) {
+private fun DiffLineRow(
+    line: DiffLine,
+    selected: Boolean = false,
+    hasComment: Boolean = false,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+) {
     val colors = TanukiTheme.colors
     if (line.type == DiffLineType.HUNK) {
         Text(
@@ -112,11 +144,12 @@ private fun DiffLineRow(line: DiffLine) {
         )
         return
     }
-    val background = when (line.type) {
+    val baseBackground = when (line.type) {
         DiffLineType.ADDITION -> colors.diffAddedBackground
         DiffLineType.DELETION -> colors.diffRemovedBackground
         else -> MaterialTheme.colorScheme.surface
     }
+    val background = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f) else baseBackground
     val sign = when (line.type) {
         DiffLineType.ADDITION -> "+"
         DiffLineType.DELETION -> "−"
@@ -127,11 +160,23 @@ private fun DiffLineRow(line: DiffLine) {
         DiffLineType.DELETION -> colors.diffRemovedAccent
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
+    val interactive = onClick != null || onLongClick != null
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                if (interactive) {
+                    Modifier.combinedClickable(
+                        onClick = { onClick?.invoke() },
+                        onLongClick = onLongClick,
+                    )
+                } else {
+                    Modifier
+                },
+            )
             .background(background)
             .padding(horizontal = 8.dp, vertical = 1.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = sign,
@@ -146,7 +191,17 @@ private fun DiffLineRow(line: DiffLine) {
             fontFamily = CodeFontFamily,
             fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
         )
+        if (hasComment) {
+            Box(
+                modifier = Modifier
+                    .padding(start = 6.dp)
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary),
+            )
+        }
     }
 }
 

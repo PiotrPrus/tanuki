@@ -21,6 +21,7 @@ data class MergeRequest(
     val hasUnresolvedDiscussions: Boolean,
     val commentCount: Int,
     val updatedAt: Instant,
+    val diffRefs: DiffRefs?,
 )
 
 /** The MR's lifecycle state, from GitLab's `state` field. */
