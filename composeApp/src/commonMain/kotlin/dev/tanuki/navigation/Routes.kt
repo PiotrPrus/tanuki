@@ -13,6 +13,9 @@ sealed interface Routes {
     data class ProjectDashboard(val projectId: Long, val projectName: String) : Routes
 
     @Serializable
+    data class ProjectMergeRequests(val projectId: Long, val projectName: String) : Routes
+
+    @Serializable
     data object Reviews : Routes
 
     @Serializable

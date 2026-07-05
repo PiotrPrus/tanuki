@@ -14,6 +14,7 @@ data class MergeRequest(
     val reference: String,
     val webUrl: String,
     val description: String?,
+    val state: MergeRequestState,
     val status: MergeStatus,
     val isDraft: Boolean,
     val hasConflicts: Boolean,
@@ -21,6 +22,9 @@ data class MergeRequest(
     val commentCount: Int,
     val updatedAt: Instant,
 )
+
+/** The MR's lifecycle state, from GitLab's `state` field. */
+enum class MergeRequestState { OPEN, MERGED, CLOSED, UNKNOWN }
 
 /** Normalised from GitLab's `detailed_merge_status`. */
 enum class MergeStatus {
