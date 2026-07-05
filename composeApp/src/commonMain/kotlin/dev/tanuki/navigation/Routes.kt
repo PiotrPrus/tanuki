@@ -10,6 +10,9 @@ sealed interface Routes {
     data object Projects : Routes
 
     @Serializable
+    data class ProjectDashboard(val projectId: Long, val projectName: String) : Routes
+
+    @Serializable
     data object Reviews : Routes
 
     @Serializable

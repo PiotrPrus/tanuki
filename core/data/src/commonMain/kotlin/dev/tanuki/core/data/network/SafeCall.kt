@@ -46,6 +46,26 @@ suspend fun safeCallEmpty(execute: suspend () -> HttpResponse): EmptyResult<Data
     }
 }
 
+/**
+ * For paginated list endpoints where we want both the items and the total count.
+ * Returns the (possibly capped by per_page) items plus the `X-Total` header value, or null on failure.
+ */
+suspend inline fun <reified T> listWithTotal(execute: () -> HttpResponse): Pair<List<T>, Int?>? {
+    val response = try {
+        execute()
+    } catch (e: Exception) {
+        coroutineContext.ensureActive()
+        return null
+    }
+    if (response.status.value !in 200..299) return null
+    val items = try {
+        response.body<List<T>>()
+    } catch (_: Exception) {
+        emptyList()
+    }
+    return items to response.headers["X-Total"]?.toIntOrNull()
+}
+
 suspend inline fun <reified T> responseToResult(response: HttpResponse): Result<T, DataError.Remote> =
     when (response.status.value) {
         in 200..299 -> try {

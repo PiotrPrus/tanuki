@@ -6,4 +6,10 @@ import dev.tanuki.core.domain.util.Result
 interface ProjectRepository {
     /** Projects for the given [filter], most recently active first. */
     suspend fun getProjects(filter: ProjectFilter): Result<List<Project>, DataError.Remote>
+
+    /** Full detail for a single project (the dashboard). */
+    suspend fun getProject(projectId: Long): Result<ProjectDetail, DataError.Remote>
+
+    /** Best-effort dashboard counts/status (parallel calls; nulls where unavailable). */
+    suspend fun getProjectStats(projectId: Long, defaultBranch: String?): ProjectStats
 }

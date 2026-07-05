@@ -6,6 +6,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(project(":feature:projects:domain"))
+            implementation(compose.materialIconsExtended)
         }
     }
 }

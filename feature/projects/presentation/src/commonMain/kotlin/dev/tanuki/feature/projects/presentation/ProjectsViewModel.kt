@@ -32,7 +32,9 @@ class ProjectsViewModel(
         when (action) {
             ProjectsAction.OnRefresh -> load()
             is ProjectsAction.OnOpen -> viewModelScope.launch {
-                _events.send(ProjectsEvent.OpenInBrowser(action.project.webUrl))
+                _events.send(
+                    ProjectsEvent.OpenDashboard(action.project.id, action.project.name),
+                )
             }
             is ProjectsAction.OnFilterChange -> {
                 if (action.filter != _state.value.filter) {

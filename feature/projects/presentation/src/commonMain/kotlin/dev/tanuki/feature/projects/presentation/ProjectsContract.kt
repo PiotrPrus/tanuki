@@ -31,5 +31,5 @@ sealed interface ProjectsAction {
 }
 
 sealed interface ProjectsEvent {
-    data class OpenInBrowser(val url: String) : ProjectsEvent
+    data class OpenDashboard(val projectId: Long, val projectName: String) : ProjectsEvent
 }
