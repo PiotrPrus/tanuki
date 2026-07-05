@@ -40,14 +40,14 @@ import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun ProjectsRoot(
-    onOpenInBrowser: (url: String) -> Unit,
+    onOpenProject: (projectId: Long, projectName: String) -> Unit,
     viewModel: ProjectsViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     ObserveAsEvents(viewModel.events) { event ->
         when (event) {
-            is ProjectsEvent.OpenInBrowser -> onOpenInBrowser(event.url)
+            is ProjectsEvent.OpenDashboard -> onOpenProject(event.projectId, event.projectName)
         }
     }
 

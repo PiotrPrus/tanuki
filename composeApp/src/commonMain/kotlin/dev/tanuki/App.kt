@@ -38,6 +38,7 @@ import dev.tanuki.feature.auth.presentation.LoginRoot
 import dev.tanuki.feature.mergerequests.presentation.MergeRequestsRoot
 import dev.tanuki.feature.mergerequests.presentation.detail.MergeRequestDetailRoot
 import dev.tanuki.feature.projects.presentation.ProjectsRoot
+import dev.tanuki.feature.projects.presentation.dashboard.ProjectDashboardRoot
 import dev.tanuki.navigation.Routes
 import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
@@ -105,7 +106,20 @@ private fun AppScaffold(startLoggedIn: Boolean) {
                 )
             }
             composable<Routes.Projects> {
-                ProjectsRoot(onOpenInBrowser = { url -> uriHandler.openUri(url) })
+                ProjectsRoot(
+                    onOpenProject = { projectId, projectName ->
+                        navController.navigate(Routes.ProjectDashboard(projectId, projectName))
+                    },
+                )
+            }
+            composable<Routes.ProjectDashboard> { entry ->
+                val route = entry.toRoute<Routes.ProjectDashboard>()
+                ProjectDashboardRoot(
+                    projectId = route.projectId,
+                    projectName = route.projectName,
+                    onBack = { navController.popBackStack() },
+                    onOpenInBrowser = { url -> uriHandler.openUri(url) },
+                )
             }
             composable<Routes.Reviews> {
                 MergeRequestsRoot(

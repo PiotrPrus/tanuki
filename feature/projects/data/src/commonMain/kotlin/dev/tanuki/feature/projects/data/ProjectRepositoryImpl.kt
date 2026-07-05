@@ -4,9 +4,12 @@ import dev.tanuki.core.data.network.safeCall
 import dev.tanuki.core.domain.util.DataError
 import dev.tanuki.core.domain.util.Result
 import dev.tanuki.core.domain.util.map
+import dev.tanuki.feature.projects.data.dto.ProjectDetailDto
 import dev.tanuki.feature.projects.data.dto.ProjectDto
 import dev.tanuki.feature.projects.data.dto.toProject
+import dev.tanuki.feature.projects.data.dto.toProjectDetail
 import dev.tanuki.feature.projects.domain.Project
+import dev.tanuki.feature.projects.domain.ProjectDetail
 import dev.tanuki.feature.projects.domain.ProjectFilter
 import dev.tanuki.feature.projects.domain.ProjectRepository
 import io.ktor.client.HttpClient
@@ -33,4 +36,9 @@ class ProjectRepositoryImpl(
                 // "Shared" = projects you're a member of that live under a group (not your own).
                 .filter { filter != ProjectFilter.SHARED || it.namespaceKind == "group" }
         }
+
+    override suspend fun getProject(projectId: Long): Result<ProjectDetail, DataError.Remote> =
+        safeCall<ProjectDetailDto> {
+            httpClient.get("projects/$projectId")
+        }.map { it.toProjectDetail() }
 }
