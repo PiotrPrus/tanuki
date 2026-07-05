@@ -13,13 +13,18 @@ import dev.tanuki.feature.projects.data.dto.CommitDto
 import dev.tanuki.feature.projects.data.dto.PipelineDto
 import dev.tanuki.feature.projects.data.dto.ProjectDetailDto
 import dev.tanuki.feature.projects.data.dto.ProjectDto
+import dev.tanuki.feature.projects.data.dto.ReleaseDto
 import dev.tanuki.feature.projects.data.dto.TagDto
 import dev.tanuki.feature.projects.data.dto.toBranch
 import dev.tanuki.feature.projects.data.dto.toProject
 import dev.tanuki.feature.projects.data.dto.toProjectDetail
+import dev.tanuki.feature.projects.data.dto.toRelease
+import dev.tanuki.feature.projects.data.dto.toTag
 import dev.tanuki.feature.projects.domain.Branch
 import dev.tanuki.feature.projects.domain.PipelineStatus
 import dev.tanuki.feature.projects.domain.Project
+import dev.tanuki.feature.projects.domain.Release
+import dev.tanuki.feature.projects.domain.Tag
 import dev.tanuki.feature.projects.domain.ProjectDetail
 import dev.tanuki.feature.projects.domain.ProjectFilter
 import dev.tanuki.feature.projects.domain.ProjectRepository
@@ -181,6 +186,20 @@ class ProjectRepositoryImpl(
                 parameter("ref", ref)
             }
         }.map { it.toBranch(openMergeRequestIid = null) }
+
+    override suspend fun getTags(projectId: Long): Result<List<Tag>, DataError.Remote> =
+        safeCall<List<TagDto>> {
+            httpClient.get("projects/$projectId/repository/tags") {
+                parameter("order_by", "updated")
+                parameter("sort", "desc")
+                parameter("per_page", 50)
+            }
+        }.map { dtos -> dtos.map { it.toTag() } }
+
+    override suspend fun getReleases(projectId: Long): Result<List<Release>, DataError.Remote> =
+        safeCall<List<ReleaseDto>> {
+            httpClient.get("projects/$projectId/releases") { parameter("per_page", 50) }
+        }.map { dtos -> dtos.map { it.toRelease() } }
 
     /**
      * Daily commit counts on [ref] over the last [ACTIVITY_WINDOW_DAYS], oldest bucket first.

@@ -18,4 +18,10 @@ interface ProjectRepository {
 
     /** Create a branch [name] from [ref] (an existing branch/tag/sha). */
     suspend fun createBranch(projectId: Long, name: String, ref: String): Result<Branch, DataError.Remote>
+
+    /** Repository tags, newest first. */
+    suspend fun getTags(projectId: Long): Result<List<Tag>, DataError.Remote>
+
+    /** Project releases, newest first. */
+    suspend fun getReleases(projectId: Long): Result<List<Release>, DataError.Remote>
 }
