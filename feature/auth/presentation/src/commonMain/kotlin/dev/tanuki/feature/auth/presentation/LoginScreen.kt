@@ -1,5 +1,6 @@
 package dev.tanuki.feature.auth.presentation
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +21,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tanuki.core.presentation.ObserveAsEvents
+import dev.tanuki.feature.auth.presentation.resources.Res
+import dev.tanuki.feature.auth.presentation.resources.tanuki_logo
+import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -51,6 +55,11 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
+        Image(
+            painter = painterResource(Res.drawable.tanuki_logo),
+            contentDescription = "Tanuki",
+            modifier = Modifier.size(96.dp).padding(bottom = 12.dp),
+        )
         Text(text = "Tanuki", style = MaterialTheme.typography.headlineMedium)
         Text(
             text = "Your GitLab projects on the go.",
