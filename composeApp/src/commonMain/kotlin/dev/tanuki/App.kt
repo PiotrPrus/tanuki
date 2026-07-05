@@ -39,6 +39,7 @@ import dev.tanuki.feature.mergerequests.presentation.MergeRequestsRoot
 import dev.tanuki.feature.mergerequests.presentation.detail.MergeRequestDetailRoot
 import dev.tanuki.feature.mergerequests.presentation.projectlist.ProjectMergeRequestsRoot
 import dev.tanuki.feature.projects.presentation.ProjectsRoot
+import dev.tanuki.feature.projects.presentation.branches.ProjectBranchesRoot
 import dev.tanuki.feature.projects.presentation.dashboard.ProjectDashboardRoot
 import dev.tanuki.navigation.Routes
 import org.koin.compose.KoinContext
@@ -121,6 +122,21 @@ private fun AppScaffold(startLoggedIn: Boolean) {
                     onBack = { navController.popBackStack() },
                     onOpenMergeRequests = { projectId, projectName ->
                         navController.navigate(Routes.ProjectMergeRequests(projectId, projectName))
+                    },
+                    onOpenBranches = { projectId, projectName ->
+                        navController.navigate(Routes.ProjectBranches(projectId, projectName))
+                    },
+                    onOpenInBrowser = { url -> uriHandler.openUri(url) },
+                )
+            }
+            composable<Routes.ProjectBranches> { entry ->
+                val route = entry.toRoute<Routes.ProjectBranches>()
+                ProjectBranchesRoot(
+                    projectId = route.projectId,
+                    projectName = route.projectName,
+                    onBack = { navController.popBackStack() },
+                    onOpenMergeRequest = { projectId, iid ->
+                        navController.navigate(Routes.MergeRequestDetail(projectId, iid))
                     },
                     onOpenInBrowser = { url -> uriHandler.openUri(url) },
                 )

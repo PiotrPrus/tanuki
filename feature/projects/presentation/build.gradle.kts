@@ -7,6 +7,7 @@ kotlin {
         commonMain.dependencies {
             implementation(project(":feature:projects:domain"))
             implementation(compose.materialIconsExtended)
+            implementation(libs.coil.compose)
         }
     }
 }
