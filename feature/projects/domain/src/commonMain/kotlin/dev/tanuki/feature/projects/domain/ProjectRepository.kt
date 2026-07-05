@@ -9,4 +9,7 @@ interface ProjectRepository {
 
     /** Full detail for a single project (the dashboard). */
     suspend fun getProject(projectId: Long): Result<ProjectDetail, DataError.Remote>
+
+    /** Best-effort dashboard counts/status (parallel calls; nulls where unavailable). */
+    suspend fun getProjectStats(projectId: Long, defaultBranch: String?): ProjectStats
 }

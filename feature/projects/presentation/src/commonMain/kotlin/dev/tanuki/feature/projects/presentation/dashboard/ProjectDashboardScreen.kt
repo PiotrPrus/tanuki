@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.AltRoute
 import androidx.compose.material.icons.filled.CallMerge
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Star
@@ -44,7 +45,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tanuki.core.designsystem.CodeFontFamily
 import dev.tanuki.core.designsystem.TanukiTheme
+import dev.tanuki.feature.projects.domain.PipelineStatus
 import dev.tanuki.feature.projects.domain.ProjectDetail
+import dev.tanuki.feature.projects.domain.ProjectStats
 import dev.tanuki.feature.projects.domain.Visibility
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -101,12 +104,12 @@ fun ProjectDashboardScreen(
                     TextButton(onClick = { onAction(ProjectDashboardAction.OnRetry) }) { Text("Retry") }
                 }
             }
-            state.detail != null -> DashboardContent(state.detail)
+            state.detail != null -> DashboardContent(state.detail, state.stats)
         }
     }
 }
 
-private enum class Tone { PRIMARY, SUCCESS, MUTED }
+private enum class Tone { PRIMARY, SUCCESS, ERROR, MUTED }
 
 private data class BentoTile(
     val label: String,
@@ -117,7 +120,7 @@ private data class BentoTile(
 )
 
 @Composable
-private fun DashboardContent(detail: ProjectDetail) {
+private fun DashboardContent(detail: ProjectDetail, stats: ProjectStats?) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
     ) {
@@ -153,15 +156,25 @@ private fun DashboardContent(detail: ProjectDetail) {
         ) {
             StatCount(Icons.Filled.Star, detail.starCount.toString())
             StatCount(Icons.Filled.AltRoute, detail.forksCount.toString())
+            stats?.contributors?.let { StatCount(Icons.Filled.Group, it.toString()) }
         }
 
+        val codeSubtitle = listOfNotNull(detail.defaultBranch, formatRepoSize(detail.repositorySizeBytes))
+            .joinToString(" • ").ifBlank { "Repository" }
+        val (pipelineLabel, pipelineTone) = pipelineDisplay(stats?.latestPipeline)
         val tiles = listOf(
-            BentoTile("Merge Requests", Icons.Filled.CallMerge, "Open", featured = true, tone = Tone.PRIMARY),
-            BentoTile("Code", Icons.Filled.Folder, detail.defaultBranch ?: "Repository"),
-            BentoTile("Tags", Icons.Filled.Label, "Latest"),
-            BentoTile("Releases", Icons.Filled.RocketLaunch, "View"),
-            BentoTile("Pipelines", Icons.Filled.CheckCircle, "View"),
-            BentoTile("Branches", Icons.Filled.AltRoute, "View"),
+            BentoTile(
+                "Merge Requests",
+                Icons.Filled.CallMerge,
+                stats?.openMergeRequests?.let { "$it Open" } ?: "Open",
+                featured = true,
+                tone = Tone.PRIMARY,
+            ),
+            BentoTile("Code", Icons.Filled.Folder, codeSubtitle),
+            BentoTile("Tags", Icons.Filled.Label, stats?.latestTag ?: stats?.tags?.let { "$it total" } ?: "Latest"),
+            BentoTile("Releases", Icons.Filled.RocketLaunch, stats?.releases?.let { "$it total" } ?: "View"),
+            BentoTile("Pipelines", Icons.Filled.CheckCircle, pipelineLabel, tone = pipelineTone),
+            BentoTile("Branches", Icons.Filled.AltRoute, stats?.branches?.let { "$it Active" } ?: "View"),
         )
         Column(
             modifier = Modifier.padding(top = 24.dp),
@@ -216,6 +229,7 @@ private fun BentoCard(tile: BentoTile, modifier: Modifier = Modifier) {
                 color = when (tile.tone) {
                     Tone.PRIMARY -> MaterialTheme.colorScheme.primary
                     Tone.SUCCESS -> TanukiTheme.colors.success
+                    Tone.ERROR -> MaterialTheme.colorScheme.error
                     Tone.MUTED -> MaterialTheme.colorScheme.onSurfaceVariant
                 },
                 modifier = Modifier.padding(top = 2.dp),
@@ -264,6 +278,25 @@ private fun ActivityPulse(modifier: Modifier = Modifier) {
                 )
             }
         }
+    }
+}
+
+private fun pipelineDisplay(status: PipelineStatus?): Pair<String, Tone> = when (status) {
+    PipelineStatus.SUCCESS -> "Passed" to Tone.SUCCESS
+    PipelineStatus.FAILED -> "Failed" to Tone.ERROR
+    PipelineStatus.RUNNING -> "Running" to Tone.PRIMARY
+    PipelineStatus.OTHER -> "See status" to Tone.MUTED
+    null -> "View" to Tone.MUTED
+}
+
+/** Bytes → a compact "2.4 MB" style string without platform String.format. */
+private fun formatRepoSize(bytes: Long?): String? {
+    if (bytes == null || bytes <= 0) return null
+    val mb = bytes / (1024.0 * 1024.0)
+    return when {
+        mb >= 1024 -> "${((mb / 1024) * 10).toLong() / 10.0} GB"
+        mb >= 1 -> "${(mb * 10).toLong() / 10.0} MB"
+        else -> "${bytes / 1024} KB"
     }
 }
 

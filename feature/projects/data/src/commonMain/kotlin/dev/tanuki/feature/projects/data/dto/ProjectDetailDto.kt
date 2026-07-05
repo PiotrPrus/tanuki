@@ -16,7 +16,13 @@ data class ProjectDetailDto(
     @SerialName("forks_count") val forksCount: Int = 0,
     @SerialName("open_issues_count") val openIssuesCount: Int = 0,
     @SerialName("default_branch") val defaultBranch: String? = null,
+    val statistics: ProjectStatisticsDto? = null,
     @SerialName("web_url") val webUrl: String,
+)
+
+@Serializable
+data class ProjectStatisticsDto(
+    @SerialName("repository_size") val repositorySize: Long? = null,
 )
 
 fun ProjectDetailDto.toProjectDetail(): ProjectDetail = ProjectDetail(
@@ -34,5 +40,6 @@ fun ProjectDetailDto.toProjectDetail(): ProjectDetail = ProjectDetail(
     forksCount = forksCount,
     openIssuesCount = openIssuesCount,
     defaultBranch = defaultBranch,
+    repositorySizeBytes = statistics?.repositorySize,
     webUrl = webUrl,
 )

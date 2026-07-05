@@ -10,5 +10,6 @@ data class ProjectDetail(
     val forksCount: Int,
     val openIssuesCount: Int,
     val defaultBranch: String?,
+    val repositorySizeBytes: Long?,
     val webUrl: String,
 )

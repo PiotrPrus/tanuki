@@ -40,10 +40,15 @@ class ProjectDashboardViewModel(
     }
 
     private fun reload() {
-        _state.update { it.copy(isLoading = true, error = null) }
+        _state.update { it.copy(isLoading = true, error = null, stats = null) }
         viewModelScope.launch {
             repository.getProject(projectId)
-                .onSuccess { detail -> _state.update { it.copy(isLoading = false, detail = detail) } }
+                .onSuccess { detail ->
+                    _state.update { it.copy(isLoading = false, detail = detail) }
+                    // Tile counts/status stream in after the detail is on screen.
+                    val stats = repository.getProjectStats(projectId, detail.defaultBranch)
+                    _state.update { it.copy(stats = stats) }
+                }
                 .onFailure {
                     _state.update {
                         it.copy(isLoading = false, error = UiText.Dynamic("Couldn't load this project."))
