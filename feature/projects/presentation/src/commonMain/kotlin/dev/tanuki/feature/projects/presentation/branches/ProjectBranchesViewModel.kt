@@ -39,6 +39,26 @@ class ProjectBranchesViewModel(
             is ProjectBranchesAction.OnOpenMergeRequest -> viewModelScope.launch {
                 _events.send(ProjectBranchesEvent.OpenMergeRequest(projectId, action.iid))
             }
+            is ProjectBranchesAction.OnCreateBranch -> createBranch(action.name.trim(), action.source)
+            ProjectBranchesAction.OnDismissCreateError -> _state.update { it.copy(createError = null) }
+        }
+    }
+
+    private fun createBranch(name: String, source: String) {
+        if (name.isBlank()) return
+        _state.update { it.copy(isCreating = true, createError = null) }
+        viewModelScope.launch {
+            repository.createBranch(projectId, name, source)
+                .onSuccess {
+                    _state.update { it.copy(isCreating = false) }
+                    _events.send(ProjectBranchesEvent.BranchCreated)
+                    reload()
+                }
+                .onFailure {
+                    _state.update {
+                        it.copy(isCreating = false, createError = UiText.Dynamic("Couldn't create branch."))
+                    }
+                }
         }
     }
 

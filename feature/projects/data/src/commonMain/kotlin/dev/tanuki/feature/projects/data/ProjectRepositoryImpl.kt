@@ -8,6 +8,7 @@ import dev.tanuki.core.domain.util.map
 import dev.tanuki.core.domain.util.onSuccess
 import dev.tanuki.feature.projects.data.dto.BranchDto
 import dev.tanuki.feature.projects.data.dto.BranchMrRefDto
+import dev.tanuki.feature.projects.data.dto.CurrentUserDto
 import dev.tanuki.feature.projects.data.dto.CommitDto
 import dev.tanuki.feature.projects.data.dto.PipelineDto
 import dev.tanuki.feature.projects.data.dto.ProjectDetailDto
@@ -26,6 +27,7 @@ import dev.tanuki.feature.projects.domain.ProjectStats
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
+import io.ktor.client.request.post
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.JsonElement
@@ -130,7 +132,7 @@ class ProjectRepositoryImpl(
                     httpClient.get("$base/repository/branches") { parameter("per_page", 100) }
                 }
             }
-            // Tag each branch with its open MR, if any (best-effort — failures leave branches untagged).
+            // Best-effort enrichment — failures just leave branches un-annotated.
             val mrRefsDeferred = async {
                 safeCall<List<BranchMrRefDto>> {
                     httpClient.get("$base/merge_requests") {
@@ -139,15 +141,46 @@ class ProjectRepositoryImpl(
                     }
                 }
             }
+            val currentUserDeferred = async { safeCall<CurrentUserDto> { httpClient.get("user") } }
 
             var mrByBranch: Map<String, Long> = emptyMap()
+            var avatarByAuthor: Map<String, String> = emptyMap()
             mrRefsDeferred.await().onSuccess { refs ->
                 mrByBranch = refs.associate { it.sourceBranch to it.iid }
+                avatarByAuthor = refs
+                    .mapNotNull { r -> r.author?.let { a -> a.name?.let { n -> a.avatarUrl?.let { n to it } } } }
+                    .toMap()
             }
+            var me: CurrentUserDto? = null
+            currentUserDeferred.await().onSuccess { me = it }
+
             branchesDeferred.await().map { dtos ->
-                dtos.map { it.toBranch(mrByBranch[it.name]) }
+                dtos.map { dto ->
+                    val branch = dto.toBranch(mrByBranch[dto.name])
+                    val mine = me?.let { u ->
+                        (u.email != null && u.email.equals(branch.lastCommitAuthorEmail, ignoreCase = true)) ||
+                            (u.name != null && u.name == branch.lastCommitAuthor)
+                    } ?: false
+                    val avatar = when {
+                        mine -> me?.avatarUrl
+                        else -> avatarByAuthor[branch.lastCommitAuthor]
+                    }
+                    branch.copy(isMine = mine, authorAvatarUrl = avatar)
+                }
             }
         }
+
+    override suspend fun createBranch(
+        projectId: Long,
+        name: String,
+        ref: String,
+    ): Result<Branch, DataError.Remote> =
+        safeCall<BranchDto> {
+            httpClient.post("projects/$projectId/repository/branches") {
+                parameter("branch", name)
+                parameter("ref", ref)
+            }
+        }.map { it.toBranch(openMergeRequestIid = null) }
 
     /**
      * Daily commit counts on [ref] over the last [ACTIVITY_WINDOW_DAYS], oldest bucket first.

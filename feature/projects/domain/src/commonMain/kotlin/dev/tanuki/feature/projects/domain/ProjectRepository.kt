@@ -15,4 +15,7 @@ interface ProjectRepository {
 
     /** Repository branches, annotated with any open merge request sourced from each. */
     suspend fun getBranches(projectId: Long): Result<List<Branch>, DataError.Remote>
+
+    /** Create a branch [name] from [ref] (an existing branch/tag/sha). */
+    suspend fun createBranch(projectId: Long, name: String, ref: String): Result<Branch, DataError.Remote>
 }
