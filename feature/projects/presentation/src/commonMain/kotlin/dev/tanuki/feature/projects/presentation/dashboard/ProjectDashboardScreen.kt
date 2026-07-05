@@ -255,7 +255,12 @@ private fun ActivityPulse(activity: List<Int>, modifier: Modifier = Modifier) {
         ) {
             Text("Activity Pulse", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(
-                if (total > 0) "$total commits · ${activity.size}d" else "Last ${activity.size.coerceAtLeast(14)} days",
+                when {
+                    // 100 is our per-page cap — the real window count may be higher.
+                    total >= 100 -> "100+ commits · ${activity.size}d"
+                    total > 0 -> "$total commits · ${activity.size}d"
+                    else -> "Last ${activity.size.coerceAtLeast(14)} days"
+                },
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

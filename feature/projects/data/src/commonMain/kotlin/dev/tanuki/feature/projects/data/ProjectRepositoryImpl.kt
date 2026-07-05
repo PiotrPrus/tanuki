@@ -125,7 +125,8 @@ class ProjectRepositoryImpl(
     private suspend fun fetchCommitActivity(base: String, ref: String?): List<Int> {
         val now = Clock.System.now()
         val since = now - ACTIVITY_WINDOW_DAYS.days
-        var commits: List<CommitDto> = emptyList()
+        // null = call failed / not loaded (→ empty list → baseline); non-null = loaded (even if no commits).
+        var commits: List<CommitDto>? = null
         safeCall<List<CommitDto>> {
             httpClient.get("$base/repository/commits") {
                 if (ref != null) parameter("ref_name", ref)
@@ -133,10 +134,10 @@ class ProjectRepositoryImpl(
                 parameter("per_page", 100)
             }
         }.onSuccess { commits = it }
-        if (commits.isEmpty()) return emptyList()
+        val loaded = commits ?: return emptyList()
 
         val buckets = IntArray(ACTIVITY_WINDOW_DAYS)
-        commits.forEach { commit ->
+        loaded.forEach { commit ->
             val ts = commit.createdAt?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: return@forEach
             val daysAgo = (now - ts).inWholeDays.toInt()
             if (daysAgo in 0 until ACTIVITY_WINDOW_DAYS) {
