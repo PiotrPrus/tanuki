@@ -34,7 +34,7 @@ import dev.snipme.highlights.Highlights
 import dev.snipme.highlights.model.BoldHighlight
 import dev.snipme.highlights.model.ColorHighlight
 import dev.snipme.highlights.model.SyntaxLanguage
-import dev.snipme.highlights.model.SyntaxThemes
+import dev.snipme.highlights.model.SyntaxTheme
 import dev.tanuki.core.designsystem.CodeFontFamily
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -150,13 +150,28 @@ private fun FileBody(content: String, fileName: String) {
     }
 }
 
+// Approximates IntelliJ's default light scheme for the token categories a lexer can detect.
+// (Per-symbol nuances — private/extension/parameter — need compiler resolution and aren't available.)
+private val IntelliJLight = SyntaxTheme(
+    key = "intellij-light",
+    code = 0x080808,          // default text
+    keyword = 0x0033B3,       // fun, val, private, by … (navy)
+    string = 0x067D17,        // "strings" (green)
+    literal = 0x1750EB,       // numbers, true/false (blue)
+    comment = 0x8C8C8C,       // // line comments (grey)
+    metadata = 0x9E880D,      // @annotations (gold)
+    multilineComment = 0x8C8C8C,
+    punctuation = 0x080808,
+    mark = 0x871094,          // secondary keywords / soft tokens (purple)
+)
+
 /** Kotlin syntax highlighting via the Highlights engine → a styled AnnotatedString. */
 private fun highlightKotlin(code: String): AnnotatedString {
     val spans = runCatching {
         Highlights.Builder()
             .code(code)
             .language(SyntaxLanguage.KOTLIN)
-            .theme(SyntaxThemes.darcula(darkMode = false))
+            .theme(IntelliJLight)
             .build()
             .getHighlights()
     }.getOrDefault(emptyList())

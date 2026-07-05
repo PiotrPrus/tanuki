@@ -162,6 +162,9 @@ private fun AppScaffold(startLoggedIn: Boolean) {
                     onOpenFile = { filePath, fileName ->
                         navController.navigate(Routes.FileView(route.projectId, route.ref, filePath, fileName))
                     },
+                    onSwitchBranch = { newRef ->
+                        navController.navigate(Routes.ProjectCode(route.projectId, route.projectName, newRef, ""))
+                    },
                 )
             }
             composable<Routes.FileView> { entry ->

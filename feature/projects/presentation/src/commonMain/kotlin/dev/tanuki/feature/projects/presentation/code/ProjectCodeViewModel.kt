@@ -32,6 +32,18 @@ class ProjectCodeViewModel(
     fun onAction(action: ProjectCodeAction) {
         when (action) {
             ProjectCodeAction.OnRetry -> reload()
+            ProjectCodeAction.OnLoadBranches -> loadBranches()
+        }
+    }
+
+    private fun loadBranches() {
+        val current = _state.value
+        if (current.branches.isNotEmpty() || current.branchesLoading) return
+        _state.update { it.copy(branchesLoading = true) }
+        viewModelScope.launch {
+            repository.getBranches(projectId)
+                .onSuccess { list -> _state.update { it.copy(branchesLoading = false, branches = list) } }
+                .onFailure { _state.update { it.copy(branchesLoading = false) } }
         }
     }
 
