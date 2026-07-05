@@ -28,6 +28,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import coil3.ImageLoader
+import coil3.compose.setSingletonImageLoaderFactory
+import coil3.network.ktor3.KtorNetworkFetcherFactory
+import io.ktor.client.HttpClient
 import dev.tanuki.core.designsystem.TanukiTheme
 import dev.tanuki.feature.auth.domain.AuthRepository
 import dev.tanuki.feature.auth.presentation.LoginRoot
@@ -41,6 +45,14 @@ import org.koin.compose.koinInject
 @Composable
 fun App() {
     KoinContext {
+        // Load images (GitLab uploads) through the authenticated Ktor client so private
+        // project media resolves with the bearer token.
+        val imageHttpClient = koinInject<HttpClient>()
+        setSingletonImageLoaderFactory { context ->
+            ImageLoader.Builder(context)
+                .components { add(KtorNetworkFetcherFactory(httpClient = imageHttpClient)) }
+                .build()
+        }
         TanukiTheme {
             Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                 val authRepository = koinInject<AuthRepository>()

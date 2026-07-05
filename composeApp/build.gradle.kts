@@ -34,6 +34,11 @@ kotlin {
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)
             implementation(libs.navigation.compose)
+
+            // Image loading (authenticated ImageLoader wired at startup)
+            implementation(libs.ktor.client.core)
+            implementation(libs.coil.compose)
+            implementation(libs.coil.network.ktor3)
         }
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)

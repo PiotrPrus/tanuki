@@ -6,6 +6,12 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(project(":feature:mergerequests:domain"))
+            implementation(libs.markdown.renderer.m3)
+            implementation(libs.markdown.renderer.coil3)
+        }
+        androidMain.dependencies {
+            implementation(libs.media3.exoplayer)
+            implementation(libs.media3.ui)
         }
     }
 }

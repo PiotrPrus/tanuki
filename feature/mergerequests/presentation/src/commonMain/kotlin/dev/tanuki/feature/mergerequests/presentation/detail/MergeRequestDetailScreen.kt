@@ -61,6 +61,9 @@ import dev.tanuki.feature.mergerequests.domain.DiffLineType
 import dev.tanuki.feature.mergerequests.domain.FileDiff
 import dev.tanuki.feature.mergerequests.domain.MergeRequest
 import dev.tanuki.feature.mergerequests.domain.MergeStatus
+import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
+import com.mikepenz.markdown.m3.Markdown
+import com.mikepenz.markdown.m3.markdownTypography
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -136,7 +139,15 @@ fun MergeRequestDetailScreen(
                             contentPadding = PaddingValues(bottom = 96.dp),
                         ) {
                             state.mergeRequest?.let { mr ->
-                                item { Header(mr, state.totalAdditions, state.totalDeletions, state.diffs.size) }
+                                item {
+                                    Header(
+                                        mr = mr,
+                                        additions = state.totalAdditions,
+                                        deletions = state.totalDeletions,
+                                        fileCount = state.diffs.size,
+                                        authToken = state.accessToken,
+                                    )
+                                }
                             }
                             items(
                                 count = state.diffs.size,
@@ -275,7 +286,7 @@ private fun DiffScrollbar(listState: LazyListState, modifier: Modifier = Modifie
 }
 
 @Composable
-private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: Int) {
+private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: Int, authToken: String?) {
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
         Text(
             text = mr.title,
@@ -321,32 +332,140 @@ private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: 
             )
         }
         mr.description?.takeIf { it.isNotBlank() }?.let { desc ->
-            Description(desc)
+            Description(
+                markdown = desc,
+                projectBaseUrl = mr.webUrl.substringBefore("/-/"),
+                projectId = mr.projectId,
+                authToken = authToken,
+            )
         }
     }
 }
 
 @Composable
-private fun Description(text: String) {
-    // TODO(#6/#7): render as Markdown + inline images/video.
+private fun Description(markdown: String, projectBaseUrl: String, projectId: Long, authToken: String?) {
     var expanded by rememberSaveable { mutableStateOf(false) }
-    var overflowing by remember { mutableStateOf(false) }
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodyMedium,
-        maxLines = if (expanded) Int.MAX_VALUE else COLLAPSED_DESCRIPTION_LINES,
-        overflow = TextOverflow.Ellipsis,
-        onTextLayout = { result -> if (!expanded) overflowing = result.hasVisualOverflow },
-        modifier = Modifier.padding(top = 12.dp),
+    val blocks = remember(markdown, projectBaseUrl, projectId) {
+        prepareDescription(markdown, projectBaseUrl, projectId)
+    }
+
+    // Headings one step smaller than the library defaults.
+    val typography = markdownTypography(
+        h1 = MaterialTheme.typography.headlineSmall,
+        h2 = MaterialTheme.typography.titleLarge,
+        h3 = MaterialTheme.typography.titleMedium,
+        h4 = MaterialTheme.typography.titleSmall,
+        h5 = MaterialTheme.typography.bodyLarge,
+        h6 = MaterialTheme.typography.bodyMedium,
     )
-    if (overflowing || expanded) {
-        TextButton(
-            onClick = { expanded = !expanded },
-            contentPadding = PaddingValues(0.dp),
+
+    Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .clickable { expanded = !expanded }
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(if (expanded) "Show less" else "Show more")
+            Text(
+                text = if (expanded) "▾" else "▸",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.width(18.dp),
+            )
+            Text(
+                text = "Description",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        if (expanded) {
+            Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                blocks.forEach { block ->
+                    when (block) {
+                        is DescriptionBlock.Md -> Markdown(
+                            content = block.markdown,
+                            imageTransformer = Coil3ImageTransformerImpl,
+                            typography = typography,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        is DescriptionBlock.Video -> InlineVideo(
+                            url = block.url,
+                            authToken = authToken,
+                            aspectRatio = block.aspectRatio,
+                            modifier = Modifier.padding(vertical = 8.dp),
+                        )
+                    }
+                }
+            }
         }
     }
+}
+
+// Video embed with optional GitLab `{width=274 height=600}` sizing attrs.
+private val VIDEO_EMBED = Regex(
+    """!\[[^\]]*]\(([^)\s]+\.(?:mov|mp4|webm|m4v|avi))\)(?:\{([^}\n]*)\})?""",
+    RegexOption.IGNORE_CASE,
+)
+private val IMAGE_UPLOAD = Regex("""(!\[[^\]]*]\()([^)\s]*/uploads/[^)\s]*)(\))""")
+private val RELATIVE_URL = Regex("""]\((/[^)\s]*)\)""")
+private val MEDIA_ATTRS = Regex("""(\))\{[^}\n]*\}""")
+private val UPLOAD_PATH = Regex("""/uploads/([^/]+)/([^)\s?#]+)""")
+private val HOST = Regex("""^https?://[^/]+""")
+private val WIDTH = Regex("""width=(\d+)""")
+private val HEIGHT = Regex("""height=(\d+)""")
+
+private sealed interface DescriptionBlock {
+    data class Md(val markdown: String) : DescriptionBlock
+    data class Video(val url: String, val aspectRatio: Float?) : DescriptionBlock
+}
+
+/**
+ * Split a GitLab description into ordered blocks — Markdown text and inline videos — so
+ * they render in their original position. Upload URLs are rewritten to the authenticated
+ * API form (`/api/v4/projects/:id/uploads/:secret/:file`); the web `/uploads/` route is
+ * session-only, but the API route accepts our OAuth token.
+ */
+private fun prepareDescription(
+    markdown: String,
+    projectBaseUrl: String,
+    projectId: Long,
+): List<DescriptionBlock> {
+    val host = HOST.find(projectBaseUrl)?.value ?: projectBaseUrl
+    val blocks = mutableListOf<DescriptionBlock>()
+    var last = 0
+    for (m in VIDEO_EMBED.findAll(markdown)) {
+        processText(markdown.substring(last, m.range.first), host, projectBaseUrl, projectId)
+            ?.let { blocks += DescriptionBlock.Md(it) }
+        val attrs = m.groupValues[2]
+        val w = WIDTH.find(attrs)?.groupValues?.get(1)?.toFloatOrNull()
+        val h = HEIGHT.find(attrs)?.groupValues?.get(1)?.toFloatOrNull()
+        val aspect = if (w != null && h != null && h > 0f) w / h else null
+        blocks += DescriptionBlock.Video(toApiUploadUrl(m.groupValues[1], host, projectId), aspect)
+        last = m.range.last + 1
+    }
+    processText(markdown.substring(last), host, projectBaseUrl, projectId)
+        ?.let { blocks += DescriptionBlock.Md(it) }
+    return blocks
+}
+
+/** Rewrite image upload URLs to the API form, resolve other relative links, strip media attrs. */
+private fun processText(text: String, host: String, projectBaseUrl: String, projectId: Long): String? {
+    val trimmed = text.trim()
+    if (trimmed.isEmpty()) return null
+    var t = IMAGE_UPLOAD.replace(trimmed) { m ->
+        "${m.groupValues[1]}${toApiUploadUrl(m.groupValues[2], host, projectId)}${m.groupValues[3]}"
+    }
+    t = RELATIVE_URL.replace(t) { m -> "](${projectBaseUrl}${m.groupValues[1]})" }
+    t = MEDIA_ATTRS.replace(t) { m -> m.groupValues[1] }
+    return t
+}
+
+/** Rewrite a `/uploads/:secret/:file` URL (relative or absolute) to the token-authenticated API path. */
+private fun toApiUploadUrl(url: String, host: String, projectId: Long): String {
+    val m = UPLOAD_PATH.find(url) ?: return url
+    return "$host/api/v4/projects/$projectId/uploads/${m.groupValues[1]}/${m.groupValues[2]}"
 }
 
 @Composable
@@ -487,5 +606,3 @@ private fun DiffLineRow(line: DiffLine) {
         )
     }
 }
-
-private const val COLLAPSED_DESCRIPTION_LINES = 6
