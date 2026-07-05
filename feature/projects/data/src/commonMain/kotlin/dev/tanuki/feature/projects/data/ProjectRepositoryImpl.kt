@@ -5,6 +5,8 @@ import dev.tanuki.core.data.network.safeCall
 import dev.tanuki.core.domain.util.DataError
 import dev.tanuki.core.domain.util.Result
 import dev.tanuki.core.domain.util.map
+import dev.tanuki.core.domain.util.onSuccess
+import dev.tanuki.feature.projects.data.dto.CommitDto
 import dev.tanuki.feature.projects.data.dto.PipelineDto
 import dev.tanuki.feature.projects.data.dto.ProjectDetailDto
 import dev.tanuki.feature.projects.data.dto.ProjectDto
@@ -23,6 +25,9 @@ import io.ktor.client.request.parameter
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.JsonElement
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 
 class ProjectRepositoryImpl(
     private val httpClient: HttpClient,
@@ -98,6 +103,7 @@ class ProjectRepositoryImpl(
                 }
             }?.first?.firstOrNull()?.status.toPipelineStatus()
         }
+        val activity = async { fetchCommitActivity(base, defaultBranch) }
 
         val tagsResult = tags.await()
         ProjectStats(
@@ -108,7 +114,40 @@ class ProjectRepositoryImpl(
             releases = releases.await(),
             contributors = contributors.await(),
             latestPipeline = pipeline.await(),
+            commitActivity = activity.await(),
         )
+    }
+
+    /**
+     * Daily commit counts on [ref] over the last [ACTIVITY_WINDOW_DAYS], oldest bucket first.
+     * Reads up to the first 100 commits in the window (one page) — enough for a relative pulse.
+     */
+    private suspend fun fetchCommitActivity(base: String, ref: String?): List<Int> {
+        val now = Clock.System.now()
+        val since = now - ACTIVITY_WINDOW_DAYS.days
+        var commits: List<CommitDto> = emptyList()
+        safeCall<List<CommitDto>> {
+            httpClient.get("$base/repository/commits") {
+                if (ref != null) parameter("ref_name", ref)
+                parameter("since", since.toString())
+                parameter("per_page", 100)
+            }
+        }.onSuccess { commits = it }
+        if (commits.isEmpty()) return emptyList()
+
+        val buckets = IntArray(ACTIVITY_WINDOW_DAYS)
+        commits.forEach { commit ->
+            val ts = commit.createdAt?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: return@forEach
+            val daysAgo = (now - ts).inWholeDays.toInt()
+            if (daysAgo in 0 until ACTIVITY_WINDOW_DAYS) {
+                buckets[ACTIVITY_WINDOW_DAYS - 1 - daysAgo]++
+            }
+        }
+        return buckets.toList()
+    }
+
+    private companion object {
+        const val ACTIVITY_WINDOW_DAYS = 14
     }
 }
 

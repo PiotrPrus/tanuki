@@ -9,6 +9,8 @@ data class ProjectStats(
     val releases: Int? = null,
     val contributors: Int? = null,
     val latestPipeline: PipelineStatus? = null,
+    /** Daily commit counts over the recent window, oldest first (empty until loaded). */
+    val commitActivity: List<Int> = emptyList(),
 )
 
 enum class PipelineStatus { SUCCESS, FAILED, RUNNING, OTHER }

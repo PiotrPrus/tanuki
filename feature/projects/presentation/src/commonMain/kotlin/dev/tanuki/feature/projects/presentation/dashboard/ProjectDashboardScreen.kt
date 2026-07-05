@@ -188,7 +188,7 @@ private fun DashboardContent(detail: ProjectDetail, stats: ProjectStats?) {
             }
         }
 
-        ActivityPulse(modifier = Modifier.padding(top = 24.dp))
+        ActivityPulse(activity = stats?.commitActivity.orEmpty(), modifier = Modifier.padding(top = 24.dp))
     }
 }
 
@@ -239,7 +239,7 @@ private fun BentoCard(tile: BentoTile, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ActivityPulse(modifier: Modifier = Modifier) {
+private fun ActivityPulse(activity: List<Int>, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -247,6 +247,7 @@ private fun ActivityPulse(modifier: Modifier = Modifier) {
             .background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(16.dp))
             .padding(16.dp),
     ) {
+        val total = activity.sum()
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -254,29 +255,62 @@ private fun ActivityPulse(modifier: Modifier = Modifier) {
         ) {
             Text("Activity Pulse", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(
-                "Last 30 days",
+                if (total > 0) "$total commits · ${activity.size}d" else "Last ${activity.size.coerceAtLeast(14)} days",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        // Decorative for now — real commit-activity data is a follow-up.
-        val bars = listOf(0.4f, 0.55f, 0.7f, 0.45f, 0.85f, 0.6f, 0.95f, 0.35f, 1f, 0.75f, 0.5f, 0.55f)
-        Row(
-            modifier = Modifier.fillMaxWidth().height(96.dp).padding(top = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            bars.forEach { fraction ->
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(fraction)
-                        .background(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.25f + fraction * 0.4f),
-                            RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp),
-                        ),
-                )
+        when {
+            activity.isEmpty() -> ActivityBaseline()
+            total == 0 -> Text(
+                "No commits in the last ${activity.size} days",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 20.dp, bottom = 20.dp),
+            )
+            else -> {
+                val max = activity.max()
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(96.dp).padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.Bottom,
+                ) {
+                    activity.forEach { count ->
+                        val fraction = (count.toFloat() / max).coerceAtLeast(if (count > 0) 0.08f else 0.02f)
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(fraction)
+                                .background(
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.25f + fraction * 0.4f),
+                                    RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp),
+                                ),
+                        )
+                    }
+                }
             }
+        }
+    }
+}
+
+/** Flat placeholder shown while commit activity is still loading. */
+@Composable
+private fun ActivityBaseline() {
+    Row(
+        modifier = Modifier.fillMaxWidth().height(96.dp).padding(top = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        repeat(14) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(0.05f)
+                    .background(
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                        RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp),
+                    ),
+            )
         }
     }
 }
