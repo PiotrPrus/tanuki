@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tanuki.core.designsystem.TanukiTheme
+import dev.tanuki.core.designsystem.tanukiFilterChipColors
 import dev.tanuki.core.presentation.ObserveAsEvents
 import dev.tanuki.feature.projects.domain.Project
 import dev.tanuki.feature.projects.domain.ProjectFilter
@@ -99,6 +100,7 @@ fun ProjectsScreen(
                     selected = state.filter == filter,
                     onClick = { onAction(ProjectsAction.OnFilterChange(filter)) },
                     label = { Text(filter.label()) },
+                    colors = tanukiFilterChipColors(),
                 )
             }
         }

@@ -64,6 +64,7 @@ fun MergeRequestsScreen(
                     selected = state.scope == scope,
                     onClick = { onAction(MergeRequestsAction.OnSelectScope(scope)) },
                     label = { Text(scope.label) },
+                    colors = dev.tanuki.core.designsystem.tanukiFilterChipColors(),
                 )
             }
         }
