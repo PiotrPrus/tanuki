@@ -167,13 +167,15 @@ fun ProjectMergeRequestsScreen(
 @Composable
 private fun MergeRequestCard(mr: MergeRequest, now: Instant, onClick: () -> Unit) {
     val isOpen = mr.state == MergeRequestState.OPEN && !mr.isDraft
+    val shape = RoundedCornerShape(12.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(IntrinsicSize.Min)
+            .clip(shape)
             .clickable(onClick = onClick)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(12.dp)),
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape),
     ) {
         // Left accent for actively-open MRs.
         Box(
