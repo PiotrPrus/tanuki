@@ -41,6 +41,7 @@ import dev.tanuki.feature.mergerequests.presentation.projectlist.ProjectMergeReq
 import dev.tanuki.feature.projects.presentation.ProjectsRoot
 import dev.tanuki.feature.projects.presentation.branches.ProjectBranchesRoot
 import dev.tanuki.feature.projects.presentation.dashboard.ProjectDashboardRoot
+import dev.tanuki.feature.projects.presentation.refdetail.RefDetailRoot
 import dev.tanuki.feature.projects.presentation.releases.ProjectReleasesRoot
 import dev.tanuki.feature.projects.presentation.tags.ProjectTagsRoot
 import dev.tanuki.navigation.Routes
@@ -143,6 +144,9 @@ private fun AppScaffold(startLoggedIn: Boolean) {
                     projectId = route.projectId,
                     projectName = route.projectName,
                     onBack = { navController.popBackStack() },
+                    onOpenTag = { ref, fromRef, title ->
+                        navController.navigate(Routes.RefDetail(route.projectId, ref, fromRef, title))
+                    },
                 )
             }
             composable<Routes.ProjectReleases> { entry ->
@@ -151,7 +155,19 @@ private fun AppScaffold(startLoggedIn: Boolean) {
                     projectId = route.projectId,
                     projectName = route.projectName,
                     onBack = { navController.popBackStack() },
-                    onOpenInBrowser = { url -> uriHandler.openUri(url) },
+                    onOpenRelease = { ref, fromRef, title ->
+                        navController.navigate(Routes.RefDetail(route.projectId, ref, fromRef, title))
+                    },
+                )
+            }
+            composable<Routes.RefDetail> { entry ->
+                val route = entry.toRoute<Routes.RefDetail>()
+                RefDetailRoot(
+                    projectId = route.projectId,
+                    ref = route.ref,
+                    fromRef = route.fromRef,
+                    title = route.title,
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable<Routes.ProjectBranches> { entry ->

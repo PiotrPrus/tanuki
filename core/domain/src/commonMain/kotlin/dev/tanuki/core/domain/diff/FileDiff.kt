@@ -1,6 +1,6 @@
-package dev.tanuki.feature.mergerequests.domain
+package dev.tanuki.core.domain.diff
 
-/** One changed file in a merge request, with its unified diff parsed into [lines]. */
+/** One changed file, with its unified diff parsed into [lines]. */
 data class FileDiff(
     val oldPath: String,
     val newPath: String,

@@ -1,8 +1,8 @@
-package dev.tanuki.feature.mergerequests.data.dto
+package dev.tanuki.core.data.diff
 
-import dev.tanuki.feature.mergerequests.domain.DiffLine
-import dev.tanuki.feature.mergerequests.domain.DiffLineType
-import dev.tanuki.feature.mergerequests.domain.FileDiff
+import dev.tanuki.core.domain.diff.DiffLine
+import dev.tanuki.core.domain.diff.DiffLineType
+import dev.tanuki.core.domain.diff.FileDiff
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 

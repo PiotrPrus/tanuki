@@ -6,10 +6,8 @@ import dev.tanuki.core.domain.util.onFailure
 import dev.tanuki.core.domain.util.onSuccess
 import dev.tanuki.core.presentation.UiText
 import dev.tanuki.feature.projects.domain.ProjectRepository
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -19,9 +17,6 @@ class ProjectReleasesViewModel(
 
     private val _state = MutableStateFlow(ProjectReleasesState())
     val state = _state.asStateFlow()
-
-    private val _events = Channel<ProjectReleasesEvent>()
-    val events = _events.receiveAsFlow()
 
     private var projectId: Long = 0
 
@@ -33,9 +28,6 @@ class ProjectReleasesViewModel(
     fun onAction(action: ProjectReleasesAction) {
         when (action) {
             ProjectReleasesAction.OnRetry -> reload()
-            is ProjectReleasesAction.OnOpen -> action.release.webUrl?.let { url ->
-                viewModelScope.launch { _events.send(ProjectReleasesEvent.OpenInBrowser(url)) }
-            }
         }
     }
 

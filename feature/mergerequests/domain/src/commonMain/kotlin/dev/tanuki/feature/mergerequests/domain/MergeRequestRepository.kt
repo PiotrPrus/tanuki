@@ -1,5 +1,6 @@
 package dev.tanuki.feature.mergerequests.domain
 
+import dev.tanuki.core.domain.diff.FileDiff
 import dev.tanuki.core.domain.util.DataError
 import dev.tanuki.core.domain.util.EmptyResult
 import dev.tanuki.core.domain.util.Result

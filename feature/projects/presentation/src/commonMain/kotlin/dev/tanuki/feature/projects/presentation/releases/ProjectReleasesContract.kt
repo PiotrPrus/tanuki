@@ -11,9 +11,4 @@ data class ProjectReleasesState(
 
 sealed interface ProjectReleasesAction {
     data object OnRetry : ProjectReleasesAction
-    data class OnOpen(val release: Release) : ProjectReleasesAction
-}
-
-sealed interface ProjectReleasesEvent {
-    data class OpenInBrowser(val url: String) : ProjectReleasesEvent
 }

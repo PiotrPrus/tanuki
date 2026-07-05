@@ -1,5 +1,6 @@
 package dev.tanuki.feature.projects.domain
 
+import dev.tanuki.core.domain.diff.FileDiff
 import dev.tanuki.core.domain.util.DataError
 import dev.tanuki.core.domain.util.Result
 
@@ -24,4 +25,10 @@ interface ProjectRepository {
 
     /** Project releases, newest first. */
     suspend fun getReleases(projectId: Long): Result<List<Release>, DataError.Remote>
+
+    /** A single release by its tag name (for its full description). */
+    suspend fun getRelease(projectId: Long, tagName: String): Result<Release, DataError.Remote>
+
+    /** Diff of everything between refs [from] and [to] (branches/tags/shas). */
+    suspend fun compareRefs(projectId: Long, from: String, to: String): Result<List<FileDiff>, DataError.Remote>
 }

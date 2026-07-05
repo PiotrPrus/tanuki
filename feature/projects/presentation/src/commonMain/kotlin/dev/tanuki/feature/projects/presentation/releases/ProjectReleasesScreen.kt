@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -38,7 +38,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import dev.tanuki.core.designsystem.CodeFontFamily
-import dev.tanuki.core.presentation.ObserveAsEvents
 import dev.tanuki.feature.projects.domain.Release
 import dev.tanuki.feature.projects.presentation.common.relativeTime
 import org.koin.compose.viewmodel.koinViewModel
@@ -49,17 +48,12 @@ fun ProjectReleasesRoot(
     projectId: Long,
     projectName: String,
     onBack: () -> Unit,
-    onOpenInBrowser: (url: String) -> Unit,
+    onOpenRelease: (ref: String, fromRef: String?, title: String) -> Unit,
     viewModel: ProjectReleasesViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(projectId) { viewModel.load(projectId) }
-    ObserveAsEvents(viewModel.events) { event ->
-        when (event) {
-            is ProjectReleasesEvent.OpenInBrowser -> onOpenInBrowser(event.url)
-        }
-    }
-    ProjectReleasesScreen(state = state, projectName = projectName, onAction = viewModel::onAction, onBack = onBack)
+    ProjectReleasesScreen(state = state, projectName = projectName, onAction = viewModel::onAction, onBack = onBack, onOpenRelease = onOpenRelease)
 }
 
 @Composable
@@ -68,6 +62,7 @@ fun ProjectReleasesScreen(
     projectName: String,
     onAction: (ProjectReleasesAction) -> Unit,
     onBack: () -> Unit,
+    onOpenRelease: (ref: String, fromRef: String?, title: String) -> Unit = { _, _, _ -> },
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -96,8 +91,10 @@ fun ProjectReleasesScreen(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    items(state.releases, key = { it.tagName }) { release ->
-                        ReleaseCard(release, relativeTime(release.releasedAt, now)) { onAction(ProjectReleasesAction.OnOpen(release)) }
+                    itemsIndexed(state.releases, key = { _, r -> r.tagName }) { index, release ->
+                        ReleaseCard(release, relativeTime(release.releasedAt, now)) {
+                            onOpenRelease(release.tagName, state.releases.getOrNull(index + 1)?.tagName, release.name)
+                        }
                     }
                 }
             }

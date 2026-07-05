@@ -3,6 +3,7 @@ package dev.tanuki.feature.projects.presentation.di
 import dev.tanuki.feature.projects.presentation.ProjectsViewModel
 import dev.tanuki.feature.projects.presentation.branches.ProjectBranchesViewModel
 import dev.tanuki.feature.projects.presentation.dashboard.ProjectDashboardViewModel
+import dev.tanuki.feature.projects.presentation.refdetail.RefDetailViewModel
 import dev.tanuki.feature.projects.presentation.releases.ProjectReleasesViewModel
 import dev.tanuki.feature.projects.presentation.tags.ProjectTagsViewModel
 import org.koin.core.module.dsl.viewModelOf
@@ -14,4 +15,5 @@ val projectsPresentationModule = module {
     viewModelOf(::ProjectBranchesViewModel)
     viewModelOf(::ProjectTagsViewModel)
     viewModelOf(::ProjectReleasesViewModel)
+    viewModelOf(::RefDetailViewModel)
 }

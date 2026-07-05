@@ -1,13 +1,16 @@
 package dev.tanuki.feature.projects.data
 
+import dev.tanuki.core.data.diff.toFileDiff
 import dev.tanuki.core.data.network.listWithTotal
 import dev.tanuki.core.data.network.safeCall
+import dev.tanuki.core.domain.diff.FileDiff
 import dev.tanuki.core.domain.util.DataError
 import dev.tanuki.core.domain.util.Result
 import dev.tanuki.core.domain.util.map
 import dev.tanuki.core.domain.util.onSuccess
 import dev.tanuki.feature.projects.data.dto.BranchDto
 import dev.tanuki.feature.projects.data.dto.BranchMrRefDto
+import dev.tanuki.feature.projects.data.dto.CompareDto
 import dev.tanuki.feature.projects.data.dto.CurrentUserDto
 import dev.tanuki.feature.projects.data.dto.CommitDto
 import dev.tanuki.feature.projects.data.dto.PipelineDto
@@ -200,6 +203,26 @@ class ProjectRepositoryImpl(
         safeCall<List<ReleaseDto>> {
             httpClient.get("projects/$projectId/releases") { parameter("per_page", 50) }
         }.map { dtos -> dtos.map { it.toRelease() } }
+
+    override suspend fun getRelease(
+        projectId: Long,
+        tagName: String,
+    ): Result<Release, DataError.Remote> =
+        safeCall<ReleaseDto> {
+            httpClient.get("projects/$projectId/releases/$tagName")
+        }.map { it.toRelease() }
+
+    override suspend fun compareRefs(
+        projectId: Long,
+        from: String,
+        to: String,
+    ): Result<List<FileDiff>, DataError.Remote> =
+        safeCall<CompareDto> {
+            httpClient.get("projects/$projectId/repository/compare") {
+                parameter("from", from)
+                parameter("to", to)
+            }
+        }.map { dto -> dto.diffs.map { it.toFileDiff() } }
 
     /**
      * Daily commit counts on [ref] over the last [ACTIVITY_WINDOW_DAYS], oldest bucket first.
