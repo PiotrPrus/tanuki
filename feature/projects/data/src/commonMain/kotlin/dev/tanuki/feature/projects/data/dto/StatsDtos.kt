@@ -11,3 +11,6 @@ data class PipelineDto(val status: String? = null)
 
 @Serializable
 data class ReleaseDto(@SerialName("tag_name") val tagName: String? = null)
+
+@Serializable
+data class CommitDto(@SerialName("created_at") val createdAt: String? = null)
