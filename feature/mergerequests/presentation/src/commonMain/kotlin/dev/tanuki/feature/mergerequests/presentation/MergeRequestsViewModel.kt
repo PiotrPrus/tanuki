@@ -31,6 +31,11 @@ class MergeRequestsViewModel(
     fun onAction(action: MergeRequestsAction) {
         when (action) {
             MergeRequestsAction.OnRefresh -> load()
+            is MergeRequestsAction.OnSelectScope -> {
+                if (action.scope == _state.value.scope) return
+                _state.update { it.copy(scope = action.scope) }
+                load()
+            }
             is MergeRequestsAction.OnOpen -> viewModelScope.launch {
                 _events.send(
                     MergeRequestsEvent.OpenDetail(
@@ -45,7 +50,11 @@ class MergeRequestsViewModel(
     private fun load() {
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
-            repository.getReviewRequested()
+            val result = when (_state.value.scope) {
+                ReviewScope.ASSIGNED_TO_ME -> repository.getAssignedToMe()
+                ReviewScope.REVIEW_REQUESTED -> repository.getReviewRequested()
+            }
+            result
                 .onSuccess { list ->
                     _state.update { it.copy(isLoading = false, mergeRequests = list) }
                 }
