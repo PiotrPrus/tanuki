@@ -41,6 +41,8 @@ import dev.tanuki.feature.mergerequests.presentation.projectlist.ProjectMergeReq
 import dev.tanuki.feature.projects.presentation.ProjectsRoot
 import dev.tanuki.feature.projects.presentation.branches.ProjectBranchesRoot
 import dev.tanuki.feature.projects.presentation.dashboard.ProjectDashboardRoot
+import dev.tanuki.feature.projects.presentation.code.FileViewRoot
+import dev.tanuki.feature.projects.presentation.code.ProjectCodeRoot
 import dev.tanuki.feature.projects.presentation.pipelines.PipelineDetailRoot
 import dev.tanuki.feature.projects.presentation.pipelines.ProjectPipelinesRoot
 import dev.tanuki.feature.projects.presentation.refdetail.RefDetailRoot
@@ -140,7 +142,36 @@ private fun AppScaffold(startLoggedIn: Boolean) {
                     onOpenPipelines = { projectId, projectName ->
                         navController.navigate(Routes.ProjectPipelines(projectId, projectName))
                     },
+                    onOpenCode = { projectId, projectName, ref ->
+                        navController.navigate(Routes.ProjectCode(projectId, projectName, ref, ""))
+                    },
                     onOpenInBrowser = { url -> uriHandler.openUri(url) },
+                )
+            }
+            composable<Routes.ProjectCode> { entry ->
+                val route = entry.toRoute<Routes.ProjectCode>()
+                ProjectCodeRoot(
+                    projectId = route.projectId,
+                    projectName = route.projectName,
+                    ref = route.ref,
+                    path = route.path,
+                    onBack = { navController.popBackStack() },
+                    onOpenDir = { path, _ ->
+                        navController.navigate(Routes.ProjectCode(route.projectId, route.projectName, route.ref, path))
+                    },
+                    onOpenFile = { filePath, fileName ->
+                        navController.navigate(Routes.FileView(route.projectId, route.ref, filePath, fileName))
+                    },
+                )
+            }
+            composable<Routes.FileView> { entry ->
+                val route = entry.toRoute<Routes.FileView>()
+                FileViewRoot(
+                    projectId = route.projectId,
+                    ref = route.ref,
+                    filePath = route.filePath,
+                    fileName = route.fileName,
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable<Routes.ProjectPipelines> { entry ->

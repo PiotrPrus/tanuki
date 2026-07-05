@@ -28,6 +28,12 @@ sealed interface Routes {
     data class ProjectPipelines(val projectId: Long, val projectName: String) : Routes
 
     @Serializable
+    data class ProjectCode(val projectId: Long, val projectName: String, val ref: String, val path: String) : Routes
+
+    @Serializable
+    data class FileView(val projectId: Long, val ref: String, val filePath: String, val fileName: String) : Routes
+
+    @Serializable
     data class PipelineDetail(val projectId: Long, val pipelineId: Long, val title: String) : Routes
 
     /** Tag/release detail: [ref] is the tag; [fromRef] is the previous tag to diff against (null = oldest). */

@@ -63,6 +63,7 @@ fun ProjectDashboardRoot(
     onOpenTags: (projectId: Long, projectName: String) -> Unit,
     onOpenReleases: (projectId: Long, projectName: String) -> Unit,
     onOpenPipelines: (projectId: Long, projectName: String) -> Unit,
+    onOpenCode: (projectId: Long, projectName: String, ref: String) -> Unit,
     onOpenInBrowser: (url: String) -> Unit,
     viewModel: ProjectDashboardViewModel = koinViewModel(),
 ) {
@@ -78,6 +79,7 @@ fun ProjectDashboardRoot(
         onOpenTags = { onOpenTags(projectId, projectName) },
         onOpenReleases = { onOpenReleases(projectId, projectName) },
         onOpenPipelines = { onOpenPipelines(projectId, projectName) },
+        onOpenCode = { ref -> onOpenCode(projectId, projectName, ref) },
     )
 }
 
@@ -103,6 +105,7 @@ fun ProjectDashboardScreen(
     onOpenTags: () -> Unit = {},
     onOpenReleases: () -> Unit = {},
     onOpenPipelines: () -> Unit = {},
+    onOpenCode: (ref: String) -> Unit = {},
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -125,7 +128,7 @@ fun ProjectDashboardScreen(
                     TextButton(onClick = { onAction(ProjectDashboardAction.OnRetry) }) { Text("Retry") }
                 }
             }
-            state.detail != null -> DashboardContent(state.detail, state.stats, onOpenMergeRequests, onOpenBranches, onOpenTags, onOpenReleases, onOpenPipelines)
+            state.detail != null -> DashboardContent(state.detail, state.stats, onOpenMergeRequests, onOpenBranches, onOpenTags, onOpenReleases, onOpenPipelines, onOpenCode)
         }
     }
 }
@@ -150,6 +153,7 @@ private fun DashboardContent(
     onOpenTags: () -> Unit,
     onOpenReleases: () -> Unit,
     onOpenPipelines: () -> Unit,
+    onOpenCode: (ref: String) -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -201,7 +205,7 @@ private fun DashboardContent(
                 tone = Tone.PRIMARY,
                 onClick = onOpenMergeRequests,
             ),
-            BentoTile("Code", Icons.Filled.Folder, codeSubtitle),
+            BentoTile("Code", Icons.Filled.Folder, codeSubtitle, onClick = { onOpenCode(detail.defaultBranch ?: "") }),
             BentoTile("Tags", Icons.Filled.Label, stats?.latestTag ?: stats?.tags?.let { "$it total" } ?: "Latest", onClick = onOpenTags),
             BentoTile("Releases", Icons.Filled.RocketLaunch, stats?.releases?.let { "$it total" } ?: "View", onClick = onOpenReleases),
             BentoTile("Pipelines", Icons.Filled.CheckCircle, pipelineLabel, tone = pipelineTone, onClick = onOpenPipelines),

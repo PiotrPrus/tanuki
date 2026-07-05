@@ -23,9 +23,11 @@ import dev.tanuki.feature.projects.data.dto.TagDto
 import dev.tanuki.feature.projects.data.dto.toBranch
 import dev.tanuki.feature.projects.data.dto.toProject
 import dev.tanuki.feature.projects.data.dto.toProjectDetail
+import dev.tanuki.feature.projects.data.dto.TreeEntryDto
 import dev.tanuki.feature.projects.data.dto.toPipeline
 import dev.tanuki.feature.projects.data.dto.toPipelineJob
 import dev.tanuki.feature.projects.data.dto.toRelease
+import dev.tanuki.feature.projects.data.dto.toRepoEntry
 import dev.tanuki.feature.projects.data.dto.toTag
 import dev.tanuki.feature.projects.domain.Branch
 import dev.tanuki.feature.projects.domain.Pipeline
@@ -38,6 +40,8 @@ import dev.tanuki.feature.projects.domain.ProjectDetail
 import dev.tanuki.feature.projects.domain.ProjectFilter
 import dev.tanuki.feature.projects.domain.ProjectRepository
 import dev.tanuki.feature.projects.domain.ProjectStats
+import dev.tanuki.feature.projects.domain.RepoEntry
+import io.ktor.http.encodeURLParameter
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
@@ -242,6 +246,30 @@ class ProjectRepositoryImpl(
         safeCall<List<JobDto>> {
             httpClient.get("projects/$projectId/pipelines/$pipelineId/jobs") { parameter("per_page", 100) }
         }.map { dtos -> dtos.map { it.toPipelineJob() } }
+
+    override suspend fun getTree(
+        projectId: Long,
+        ref: String,
+        path: String,
+    ): Result<List<RepoEntry>, DataError.Remote> =
+        safeCall<List<TreeEntryDto>> {
+            httpClient.get("projects/$projectId/repository/tree") {
+                if (path.isNotBlank()) parameter("path", path)
+                if (ref.isNotBlank()) parameter("ref", ref)
+                parameter("per_page", 100)
+            }
+        }.map { dtos -> dtos.map { it.toRepoEntry() } }
+
+    override suspend fun getFileContent(
+        projectId: Long,
+        ref: String,
+        filePath: String,
+    ): Result<String, DataError.Remote> =
+        safeCall<String> {
+            httpClient.get("projects/$projectId/repository/files/${filePath.encodeURLParameter()}/raw") {
+                if (ref.isNotBlank()) parameter("ref", ref)
+            }
+        }
 
     /**
      * Daily commit counts on [ref] over the last [ACTIVITY_WINDOW_DAYS], oldest bucket first.
