@@ -1,16 +1,16 @@
 package dev.tanuki.feature.mergerequests.data
 
+import dev.tanuki.core.data.diff.DiffDto
+import dev.tanuki.core.data.diff.toFileDiff
 import dev.tanuki.core.data.network.safeCall
 import dev.tanuki.core.data.network.safeCallEmpty
+import dev.tanuki.core.domain.diff.FileDiff
 import dev.tanuki.core.domain.util.DataError
 import dev.tanuki.core.domain.util.EmptyResult
 import dev.tanuki.core.domain.util.Result
 import dev.tanuki.core.domain.util.map
-import dev.tanuki.feature.mergerequests.data.dto.DiffDto
 import dev.tanuki.feature.mergerequests.data.dto.MergeRequestDto
-import dev.tanuki.feature.mergerequests.data.dto.toFileDiff
 import dev.tanuki.feature.mergerequests.data.mapper.toMergeRequest
-import dev.tanuki.feature.mergerequests.domain.FileDiff
 import dev.tanuki.feature.mergerequests.domain.MergeRequest
 import dev.tanuki.feature.mergerequests.domain.MergeRequestFilter
 import dev.tanuki.feature.mergerequests.domain.MergeRequestRepository

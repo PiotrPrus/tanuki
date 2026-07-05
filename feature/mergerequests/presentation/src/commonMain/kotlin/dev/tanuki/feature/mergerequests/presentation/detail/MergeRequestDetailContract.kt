@@ -1,7 +1,7 @@
 package dev.tanuki.feature.mergerequests.presentation.detail
 
+import dev.tanuki.core.domain.diff.FileDiff
 import dev.tanuki.core.presentation.UiText
-import dev.tanuki.feature.mergerequests.domain.FileDiff
 import dev.tanuki.feature.mergerequests.domain.MergeRequest
 
 data class MergeRequestDetailState(

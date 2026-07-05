@@ -1,25 +1,33 @@
 package dev.tanuki.feature.projects.data
 
+import dev.tanuki.core.data.diff.toFileDiff
 import dev.tanuki.core.data.network.listWithTotal
 import dev.tanuki.core.data.network.safeCall
+import dev.tanuki.core.domain.diff.FileDiff
 import dev.tanuki.core.domain.util.DataError
 import dev.tanuki.core.domain.util.Result
 import dev.tanuki.core.domain.util.map
 import dev.tanuki.core.domain.util.onSuccess
 import dev.tanuki.feature.projects.data.dto.BranchDto
 import dev.tanuki.feature.projects.data.dto.BranchMrRefDto
+import dev.tanuki.feature.projects.data.dto.CompareDto
 import dev.tanuki.feature.projects.data.dto.CurrentUserDto
 import dev.tanuki.feature.projects.data.dto.CommitDto
 import dev.tanuki.feature.projects.data.dto.PipelineDto
 import dev.tanuki.feature.projects.data.dto.ProjectDetailDto
 import dev.tanuki.feature.projects.data.dto.ProjectDto
+import dev.tanuki.feature.projects.data.dto.ReleaseDto
 import dev.tanuki.feature.projects.data.dto.TagDto
 import dev.tanuki.feature.projects.data.dto.toBranch
 import dev.tanuki.feature.projects.data.dto.toProject
 import dev.tanuki.feature.projects.data.dto.toProjectDetail
+import dev.tanuki.feature.projects.data.dto.toRelease
+import dev.tanuki.feature.projects.data.dto.toTag
 import dev.tanuki.feature.projects.domain.Branch
 import dev.tanuki.feature.projects.domain.PipelineStatus
 import dev.tanuki.feature.projects.domain.Project
+import dev.tanuki.feature.projects.domain.Release
+import dev.tanuki.feature.projects.domain.Tag
 import dev.tanuki.feature.projects.domain.ProjectDetail
 import dev.tanuki.feature.projects.domain.ProjectFilter
 import dev.tanuki.feature.projects.domain.ProjectRepository
@@ -181,6 +189,40 @@ class ProjectRepositoryImpl(
                 parameter("ref", ref)
             }
         }.map { it.toBranch(openMergeRequestIid = null) }
+
+    override suspend fun getTags(projectId: Long): Result<List<Tag>, DataError.Remote> =
+        safeCall<List<TagDto>> {
+            httpClient.get("projects/$projectId/repository/tags") {
+                parameter("order_by", "updated")
+                parameter("sort", "desc")
+                parameter("per_page", 50)
+            }
+        }.map { dtos -> dtos.map { it.toTag() } }
+
+    override suspend fun getReleases(projectId: Long): Result<List<Release>, DataError.Remote> =
+        safeCall<List<ReleaseDto>> {
+            httpClient.get("projects/$projectId/releases") { parameter("per_page", 50) }
+        }.map { dtos -> dtos.map { it.toRelease() } }
+
+    override suspend fun getRelease(
+        projectId: Long,
+        tagName: String,
+    ): Result<Release, DataError.Remote> =
+        safeCall<ReleaseDto> {
+            httpClient.get("projects/$projectId/releases/$tagName")
+        }.map { it.toRelease() }
+
+    override suspend fun compareRefs(
+        projectId: Long,
+        from: String,
+        to: String,
+    ): Result<List<FileDiff>, DataError.Remote> =
+        safeCall<CompareDto> {
+            httpClient.get("projects/$projectId/repository/compare") {
+                parameter("from", from)
+                parameter("to", to)
+            }
+        }.map { dto -> dto.diffs.map { it.toFileDiff() } }
 
     /**
      * Daily commit counts on [ref] over the last [ACTIVITY_WINDOW_DAYS], oldest bucket first.
