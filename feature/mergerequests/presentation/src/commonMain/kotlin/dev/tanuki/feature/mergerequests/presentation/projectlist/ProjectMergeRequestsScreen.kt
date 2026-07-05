@@ -96,6 +96,7 @@ fun ProjectMergeRequestsScreen(
                     selected = state.filter == filter,
                     onClick = { onAction(ProjectMergeRequestsAction.OnSelectFilter(filter)) },
                     label = { Text(filter.label()) },
+                    colors = dev.tanuki.core.designsystem.tanukiFilterChipColors(),
                 )
             }
         }
