@@ -37,4 +37,10 @@ interface ProjectRepository {
 
     /** Jobs of a single pipeline (for the stage breakdown). */
     suspend fun getPipelineJobs(projectId: Long, pipelineId: Long): Result<List<PipelineJob>, DataError.Remote>
+
+    /** Directory listing at [path] (empty = repo root) on [ref] (empty = default branch). */
+    suspend fun getTree(projectId: Long, ref: String, path: String): Result<List<RepoEntry>, DataError.Remote>
+
+    /** Raw text of a file at [filePath] on [ref]. */
+    suspend fun getFileContent(projectId: Long, ref: String, filePath: String): Result<String, DataError.Remote>
 }

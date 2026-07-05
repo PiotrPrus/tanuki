@@ -8,6 +8,7 @@ kotlin {
             implementation(project(":feature:projects:domain"))
             implementation(compose.materialIconsExtended)
             implementation(libs.coil.compose)
+            implementation(libs.highlights)
             implementation(libs.markdown.renderer.m3)
         }
     }
