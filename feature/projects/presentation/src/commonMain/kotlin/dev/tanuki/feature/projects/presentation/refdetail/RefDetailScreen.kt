@@ -36,11 +36,12 @@ fun RefDetailRoot(
     ref: String,
     fromRef: String?,
     title: String,
+    isRelease: Boolean,
     onBack: () -> Unit,
     viewModel: RefDetailViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    LaunchedEffect(projectId, ref) { viewModel.load(projectId, ref, fromRef, title) }
+    LaunchedEffect(projectId, ref) { viewModel.load(projectId, ref, fromRef, title, isRelease) }
     RefDetailScreen(state = state, onAction = viewModel::onAction, onBack = onBack)
 }
 
@@ -55,7 +56,7 @@ fun RefDetailScreen(
             TextButton(onClick = onBack) { Text("‹ Back") }
         }
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-            Text("RELEASE", style = MaterialTheme.typography.labelMedium, fontFamily = CodeFontFamily, color = MaterialTheme.colorScheme.secondary)
+            Text(if (state.isRelease) "RELEASE" else "TAG", style = MaterialTheme.typography.labelMedium, fontFamily = CodeFontFamily, color = MaterialTheme.colorScheme.secondary)
             Text(state.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, fontFamily = CodeFontFamily)
         }
 

@@ -5,6 +5,7 @@ import dev.tanuki.core.presentation.UiText
 
 data class RefDetailState(
     val title: String = "",
+    val isRelease: Boolean = true,
     val isLoading: Boolean = true,
     val description: String? = null,
     val diffs: List<FileDiff> = emptyList(),

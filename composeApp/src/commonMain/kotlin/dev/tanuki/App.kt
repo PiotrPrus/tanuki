@@ -145,7 +145,7 @@ private fun AppScaffold(startLoggedIn: Boolean) {
                     projectName = route.projectName,
                     onBack = { navController.popBackStack() },
                     onOpenTag = { ref, fromRef, title ->
-                        navController.navigate(Routes.RefDetail(route.projectId, ref, fromRef, title))
+                        navController.navigate(Routes.RefDetail(route.projectId, ref, fromRef, title, isRelease = false))
                     },
                 )
             }
@@ -156,7 +156,7 @@ private fun AppScaffold(startLoggedIn: Boolean) {
                     projectName = route.projectName,
                     onBack = { navController.popBackStack() },
                     onOpenRelease = { ref, fromRef, title ->
-                        navController.navigate(Routes.RefDetail(route.projectId, ref, fromRef, title))
+                        navController.navigate(Routes.RefDetail(route.projectId, ref, fromRef, title, isRelease = true))
                     },
                 )
             }
@@ -167,6 +167,7 @@ private fun AppScaffold(startLoggedIn: Boolean) {
                     ref = route.ref,
                     fromRef = route.fromRef,
                     title = route.title,
+                    isRelease = route.isRelease,
                     onBack = { navController.popBackStack() },
                 )
             }

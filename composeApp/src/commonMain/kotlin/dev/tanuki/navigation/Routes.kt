@@ -26,7 +26,13 @@ sealed interface Routes {
 
     /** Tag/release detail: [ref] is the tag; [fromRef] is the previous tag to diff against (null = oldest). */
     @Serializable
-    data class RefDetail(val projectId: Long, val ref: String, val fromRef: String?, val title: String) : Routes
+    data class RefDetail(
+        val projectId: Long,
+        val ref: String,
+        val fromRef: String?,
+        val title: String,
+        val isRelease: Boolean,
+    ) : Routes
 
     @Serializable
     data object Reviews : Routes

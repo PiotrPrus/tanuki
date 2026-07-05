@@ -23,11 +23,11 @@ class RefDetailViewModel(
     private var ref: String = ""
     private var fromRef: String? = null
 
-    fun load(projectId: Long, ref: String, fromRef: String?, title: String) {
+    fun load(projectId: Long, ref: String, fromRef: String?, title: String, isRelease: Boolean) {
         this.projectId = projectId
         this.ref = ref
         this.fromRef = fromRef
-        _state.update { it.copy(title = title, hasComparison = fromRef != null) }
+        _state.update { it.copy(title = title, isRelease = isRelease, hasComparison = fromRef != null) }
         reload()
     }
 
