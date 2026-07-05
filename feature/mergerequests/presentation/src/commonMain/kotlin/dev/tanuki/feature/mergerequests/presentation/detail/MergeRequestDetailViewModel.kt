@@ -228,6 +228,11 @@ class MergeRequestDetailViewModel(
                 .onSuccess { diffs -> _state.update { it.copy(diffs = diffs) } }
             loadDiscussions()
             _state.update { it.copy(isLoading = false) }
+            // Secondary tab data — best-effort, streams in after the main content.
+            repository.getCommits(projectId, iid)
+                .onSuccess { list -> _state.update { it.copy(commits = list) } }
+            repository.getPipelines(projectId, iid)
+                .onSuccess { list -> _state.update { it.copy(pipelines = list) } }
         }
     }
 

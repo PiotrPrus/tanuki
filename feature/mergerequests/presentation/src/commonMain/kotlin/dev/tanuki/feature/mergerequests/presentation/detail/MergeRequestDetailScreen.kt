@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -110,7 +111,8 @@ fun MergeRequestDetailScreen(
 ) {
     var showReviewSheet by remember { mutableStateOf(false) }
     var showComposer by remember { mutableStateOf(false) }
-    val listState = rememberLazyListState()
+    var selectedTab by rememberSaveable { mutableStateOf(0) }
+    val commenting = state.inSelectionMode && selectedTab == 3
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -127,125 +129,239 @@ fun MergeRequestDetailScreen(
                 }
             }
 
-            if (state.inSelectionMode) {
-                SelectionBar(
-                    count = state.selectedCount,
-                    onCancel = { onAction(MergeRequestDetailAction.OnCancelSelection) },
-                )
-            }
-
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                when {
-                    state.isLoading -> Box(Modifier.fillMaxSize(), Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                    state.error != null -> Box(Modifier.fillMaxSize(), Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(state.error.asString(), color = MaterialTheme.colorScheme.error)
-                            TextButton(onClick = { onAction(MergeRequestDetailAction.OnRetry) }) { Text("Retry") }
-                        }
-                    }
-                    else -> {
-                        LazyColumn(
-                            state = listState,
-                            contentPadding = PaddingValues(bottom = 96.dp),
-                        ) {
-                            state.mergeRequest?.let { mr ->
-                                item {
-                                    Header(
-                                        mr = mr,
-                                        additions = state.totalAdditions,
-                                        deletions = state.totalDeletions,
-                                        fileCount = state.diffs.size,
-                                        authToken = state.accessToken,
-                                    )
-                                }
-                            }
-                            items(
-                                count = state.diffs.size,
-                                key = { index -> state.diffs[index].newPath + index },
-                            ) { index ->
-                                val file = state.diffs[index]
-                                FileDiffView(
-                                    file = file,
-                                    onLineLongPress = { line ->
-                                        onAction(
-                                            MergeRequestDetailAction.OnStartSelection(
-                                                file.newPath, file.oldPath, line.newLine, line.oldLine,
-                                            ),
-                                        )
-                                    },
-                                    onLineClick = { line ->
-                                        if (state.inSelectionMode) {
-                                            onAction(
-                                                MergeRequestDetailAction.OnToggleLine(
-                                                    file.newPath, file.oldPath, line.newLine, line.oldLine,
-                                                ),
-                                            )
-                                        } else {
-                                            discussionForLine(state, file.newPath, file.oldPath, line)?.let {
-                                                onAction(MergeRequestDetailAction.OnOpenThread(it))
-                                            }
-                                        }
-                                    },
-                                    isLineSelected = { line -> lineSelected(state, file.newPath, line) },
-                                    lineHasComment = { line ->
-                                        discussionForLine(state, file.newPath, file.oldPath, line) != null
-                                    },
-                                )
-                            }
-                            val diffThreadKeys = state.commentByKey.values.map { it.id }.toSet()
-                            val overall = state.discussions.filter { !it.isOnDiff && it.notes.any { n -> !n.system } }
-                            if (state.discussions.any { it.isOnDiff } || overall.isNotEmpty()) {
-                                item { ActivityHeader() }
-                            }
-                            items(count = overall.size, key = { "overall-${overall[it].id}" }) { i ->
-                                DiscussionRow(overall[i]) { onAction(MergeRequestDetailAction.OnOpenThread(overall[i])) }
-                            }
-                            val diffThreads = state.discussions.filter { it.isOnDiff }
-                            items(count = diffThreads.size, key = { "diff-${diffThreads[it].id}" }) { i ->
-                                DiscussionRow(diffThreads[i]) { onAction(MergeRequestDetailAction.OnOpenThread(diffThreads[i])) }
-                            }
-                        }
-                        DiffScrollbar(listState, Modifier.align(Alignment.CenterEnd))
+            when {
+                state.isLoading -> Box(Modifier.weight(1f).fillMaxWidth(), Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+                state.error != null -> Box(Modifier.weight(1f).fillMaxWidth(), Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(state.error.asString(), color = MaterialTheme.colorScheme.error)
+                        TextButton(onClick = { onAction(MergeRequestDetailAction.OnRetry) }) { Text("Retry") }
                     }
                 }
-                SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+                state.mergeRequest != null -> {
+                    val mr = state.mergeRequest
+                    Header(mr, state.totalAdditions, state.totalDeletions, state.diffs.size)
+                    MrTabs(
+                        selected = selectedTab,
+                        overviewCount = state.threadCount,
+                        commitCount = state.commits.size,
+                        pipelineCount = state.pipelines.size,
+                        changeCount = state.diffs.size,
+                        onSelect = { selectedTab = it },
+                    )
+                    if (commenting) {
+                        SelectionBar(state.selectedCount) { onAction(MergeRequestDetailAction.OnCancelSelection) }
+                    }
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        when (selectedTab) {
+                            1 -> CommitsTab(state)
+                            2 -> PipelinesTab(state)
+                            3 -> ChangesTab(state, onAction)
+                            else -> OverviewTab(mr, state, onAction)
+                        }
+                        SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+                    }
+                }
             }
         }
 
         if (state.mergeRequest != null && state.error == null) {
             ExtendedFloatingActionButton(
-                onClick = { if (state.inSelectionMode) showComposer = true else showReviewSheet = true },
-                icon = { Text(if (state.inSelectionMode) "💬" else "✓") },
-                text = { Text(if (state.inSelectionMode) "Comment (${state.selectedCount})" else "Review") },
+                onClick = { if (commenting) showComposer = true else showReviewSheet = true },
+                icon = { Text(if (commenting) "💬" else "✓") },
+                text = { Text(if (commenting) "Comment (${state.selectedCount})" else "Review") },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
             )
         }
     }
 
     if (showReviewSheet && state.mergeRequest != null) {
-        ReviewSheet(
-            state = state,
-            onAction = onAction,
-            onDismiss = { showReviewSheet = false },
-        )
+        ReviewSheet(state = state, onAction = onAction, onDismiss = { showReviewSheet = false })
     }
-
     if (showComposer && state.inSelectionMode) {
-        DiffCommentSheet(
-            state = state,
-            onAction = onAction,
-            onDismiss = { showComposer = false },
-        )
+        DiffCommentSheet(state = state, onAction = onAction, onDismiss = { showComposer = false })
     }
+    state.activeThread?.let { thread -> ThreadSheet(thread = thread, state = state, onAction = onAction) }
+}
 
-    state.activeThread?.let { thread ->
-        ThreadSheet(
-            thread = thread,
-            state = state,
-            onAction = onAction,
-        )
+@Composable
+private fun MrTabs(
+    selected: Int,
+    overviewCount: Int,
+    commitCount: Int,
+    pipelineCount: Int,
+    changeCount: Int,
+    onSelect: (Int) -> Unit,
+) {
+    androidx.compose.material3.TabRow(selectedTabIndex = selected) {
+        MrTab("Overview", overviewCount, selected == 0) { onSelect(0) }
+        MrTab("Commits", commitCount, selected == 1) { onSelect(1) }
+        MrTab("Pipelines", pipelineCount, selected == 2) { onSelect(2) }
+        MrTab("Changes", changeCount, selected == 3) { onSelect(3) }
+    }
+}
+
+@Composable
+private fun MrTab(label: String, count: Int, selected: Boolean, onClick: () -> Unit) {
+    androidx.compose.material3.Tab(
+        selected = selected,
+        onClick = onClick,
+        text = {
+            Text(
+                text = if (count > 0) "$label · $count" else label,
+                maxLines = 1,
+                style = MaterialTheme.typography.labelLarge,
+            )
+        },
+    )
+}
+
+@Composable
+private fun OverviewTab(
+    mr: MergeRequest,
+    state: MergeRequestDetailState,
+    onAction: (MergeRequestDetailAction) -> Unit,
+) {
+    val threads = state.discussions.filter { it.notes.any { n -> !n.system } }
+    LazyColumn(contentPadding = PaddingValues(bottom = 96.dp)) {
+        mr.description?.takeIf { it.isNotBlank() }?.let { desc ->
+            item {
+                Description(
+                    markdown = desc,
+                    projectBaseUrl = mr.webUrl.substringBefore("/-/"),
+                    projectId = mr.projectId,
+                    authToken = state.accessToken,
+                )
+            }
+        }
+        if (threads.isNotEmpty()) item { ActivityHeader() }
+        items(count = threads.size, key = { "t-${threads[it].id}" }) { i ->
+            DiscussionRow(threads[i]) { onAction(MergeRequestDetailAction.OnOpenThread(threads[i])) }
+        }
+        if (mr.description.isNullOrBlank() && threads.isEmpty()) {
+            item { EmptyTab("Nothing here yet.") }
+        }
+    }
+}
+
+@Composable
+private fun ChangesTab(state: MergeRequestDetailState, onAction: (MergeRequestDetailAction) -> Unit) {
+    if (state.diffs.isEmpty()) {
+        EmptyTab("No changes.")
+        return
+    }
+    val listState = rememberLazyListState()
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 96.dp)) {
+            items(count = state.diffs.size, key = { index -> state.diffs[index].newPath + index }) { index ->
+                val file = state.diffs[index]
+                FileDiffView(
+                    file = file,
+                    onLineLongPress = { line ->
+                        onAction(
+                            MergeRequestDetailAction.OnStartSelection(
+                                file.newPath, file.oldPath, line.newLine, line.oldLine,
+                            ),
+                        )
+                    },
+                    onLineClick = { line ->
+                        if (state.inSelectionMode) {
+                            onAction(
+                                MergeRequestDetailAction.OnToggleLine(
+                                    file.newPath, file.oldPath, line.newLine, line.oldLine,
+                                ),
+                            )
+                        } else {
+                            discussionForLine(state, file.newPath, file.oldPath, line)?.let {
+                                onAction(MergeRequestDetailAction.OnOpenThread(it))
+                            }
+                        }
+                    },
+                    isLineSelected = { line -> lineSelected(state, file.newPath, line) },
+                    lineHasComment = { line -> discussionForLine(state, file.newPath, file.oldPath, line) != null },
+                )
+            }
+        }
+        DiffScrollbar(listState, Modifier.align(Alignment.CenterEnd))
+    }
+}
+
+@Composable
+private fun CommitsTab(state: MergeRequestDetailState) {
+    if (state.commits.isEmpty()) {
+        EmptyTab("No commits.")
+        return
+    }
+    val now = remember { Clock.System.now() }
+    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        items(count = state.commits.size, key = { state.commits[it].shortId + it }) { i ->
+            val c = state.commits[i]
+            Column(
+                Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                    .padding(12.dp),
+            ) {
+                Text(c.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Row(modifier = Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(c.shortId, style = MaterialTheme.typography.labelMedium, fontFamily = CodeFontFamily, color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        (c.authorName?.let { "$it · " } ?: "") + relativeTime(c.createdAt, now),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PipelinesTab(state: MergeRequestDetailState) {
+    if (state.pipelines.isEmpty()) {
+        EmptyTab("No pipelines.")
+        return
+    }
+    val now = remember { Clock.System.now() }
+    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        items(count = state.pipelines.size, key = { state.pipelines[it].id }) { i ->
+            val p = state.pipelines[i]
+            val color = when (p.status) {
+                "success" -> TanukiTheme.colors.success
+                "failed" -> MaterialTheme.colorScheme.error
+                "running", "pending", "created" -> MaterialTheme.colorScheme.primary
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            Row(
+                Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Box(Modifier.size(10.dp).clip(RoundedCornerShape(5.dp)).background(color))
+                Column(Modifier.weight(1f)) {
+                    Text(p.ref, style = MaterialTheme.typography.bodyMedium, fontFamily = CodeFontFamily, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        "#${p.id} · ${p.status} · ${relativeTime(p.createdAt, now)}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyTab(text: String) {
+    Box(Modifier.fillMaxSize(), Alignment.Center) {
+        Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -539,7 +655,7 @@ private fun DiscussionRow(discussion: Discussion, onClick: () -> Unit) {
 }
 
 @Composable
-private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: Int, authToken: String?) {
+private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: Int) {
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
         Text(
             text = mr.title,
@@ -582,14 +698,6 @@ private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: 
                 text = " · $fileCount " + if (fileCount == 1) "file" else "files",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        mr.description?.takeIf { it.isNotBlank() }?.let { desc ->
-            Description(
-                markdown = desc,
-                projectBaseUrl = mr.webUrl.substringBefore("/-/"),
-                projectId = mr.projectId,
-                authToken = authToken,
             )
         }
     }

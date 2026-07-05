@@ -4,6 +4,8 @@ import dev.tanuki.core.domain.diff.FileDiff
 import dev.tanuki.core.presentation.UiText
 import dev.tanuki.feature.mergerequests.domain.Discussion
 import dev.tanuki.feature.mergerequests.domain.MergeRequest
+import dev.tanuki.feature.mergerequests.domain.MrCommit
+import dev.tanuki.feature.mergerequests.domain.MrPipeline
 
 /** A diff line the user tapped/long-pressed, identified by its side line numbers. */
 data class SelectedLine(val newLine: Int?, val oldLine: Int?)
@@ -39,12 +41,16 @@ data class MergeRequestDetailState(
     val activeThread: Discussion? = null,
     val threadReplyText: String = "",
     val isThreadBusy: Boolean = false,
+    val commits: List<MrCommit> = emptyList(),
+    val pipelines: List<MrPipeline> = emptyList(),
 ) {
     val totalAdditions: Int get() = diffs.sumOf { it.additions }
     val totalDeletions: Int get() = diffs.sumOf { it.deletions }
     val actionInProgress: Boolean get() = isApproving || isMerging || isCommenting
     val inSelectionMode: Boolean get() = selection != null
     val selectedCount: Int get() = selection?.lines?.size ?: 0
+    /** Count of user (non-system) threads — shown on the Overview tab. */
+    val threadCount: Int get() = discussions.count { d -> d.notes.any { !it.system } }
 }
 
 sealed interface MergeRequestDetailAction {

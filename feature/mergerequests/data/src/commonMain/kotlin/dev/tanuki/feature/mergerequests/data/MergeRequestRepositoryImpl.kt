@@ -11,12 +11,18 @@ import dev.tanuki.core.domain.util.Result
 import dev.tanuki.core.domain.util.map
 import dev.tanuki.feature.mergerequests.data.dto.DiscussionDto
 import dev.tanuki.feature.mergerequests.data.dto.MergeRequestDto
+import dev.tanuki.feature.mergerequests.data.dto.MrCommitDto
+import dev.tanuki.feature.mergerequests.data.dto.MrPipelineDto
 import dev.tanuki.feature.mergerequests.data.dto.toDiscussion
+import dev.tanuki.feature.mergerequests.data.dto.toMrCommit
+import dev.tanuki.feature.mergerequests.data.dto.toMrPipeline
 import dev.tanuki.feature.mergerequests.data.mapper.toMergeRequest
 import dev.tanuki.feature.mergerequests.domain.Discussion
 import dev.tanuki.feature.mergerequests.domain.MergeRequest
 import dev.tanuki.feature.mergerequests.domain.MergeRequestFilter
 import dev.tanuki.feature.mergerequests.domain.MergeRequestRepository
+import dev.tanuki.feature.mergerequests.domain.MrCommit
+import dev.tanuki.feature.mergerequests.domain.MrPipeline
 import dev.tanuki.feature.mergerequests.domain.NewDiffComment
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
@@ -137,6 +143,22 @@ class MergeRequestRepositoryImpl(
                 parameter("resolved", resolved)
             }
         }
+
+    override suspend fun getCommits(
+        projectId: Long,
+        iid: Long,
+    ): Result<List<MrCommit>, DataError.Remote> =
+        safeCall<List<MrCommitDto>> {
+            httpClient.get("projects/$projectId/merge_requests/$iid/commits") { parameter("per_page", 100) }
+        }.map { dtos -> dtos.map { it.toMrCommit() } }
+
+    override suspend fun getPipelines(
+        projectId: Long,
+        iid: Long,
+    ): Result<List<MrPipeline>, DataError.Remote> =
+        safeCall<List<MrPipelineDto>> {
+            httpClient.get("projects/$projectId/merge_requests/$iid/pipelines") { parameter("per_page", 20) }
+        }.map { dtos -> dtos.map { it.toMrPipeline() } }
 
     private suspend fun fetch(scope: String): Result<List<MergeRequest>, DataError.Remote> =
         safeCall<List<MergeRequestDto>> {

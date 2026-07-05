@@ -48,4 +48,10 @@ interface MergeRequestRepository {
         discussionId: String,
         resolved: Boolean,
     ): EmptyResult<DataError.Remote>
+
+    /** Commits included in the MR, newest first. */
+    suspend fun getCommits(projectId: Long, iid: Long): Result<List<MrCommit>, DataError.Remote>
+
+    /** Pipelines run for the MR, newest first. */
+    suspend fun getPipelines(projectId: Long, iid: Long): Result<List<MrPipeline>, DataError.Remote>
 }
