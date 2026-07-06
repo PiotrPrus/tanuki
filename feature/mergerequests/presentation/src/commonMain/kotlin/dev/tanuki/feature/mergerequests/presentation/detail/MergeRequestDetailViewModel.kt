@@ -233,6 +233,8 @@ class MergeRequestDetailViewModel(
                 .onSuccess { list -> _state.update { it.copy(commits = list) } }
             repository.getPipelines(projectId, iid)
                 .onSuccess { list -> _state.update { it.copy(pipelines = list) } }
+            repository.getApprovals(projectId, iid)
+                .onSuccess { info -> _state.update { it.copy(approvals = info) } }
         }
     }
 

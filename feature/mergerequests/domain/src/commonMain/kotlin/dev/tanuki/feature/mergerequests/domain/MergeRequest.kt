@@ -22,6 +22,7 @@ data class MergeRequest(
     val commentCount: Int,
     val updatedAt: Instant,
     val diffRefs: DiffRefs?,
+    val reviewers: List<MrUser>,
 )
 
 /** The MR's lifecycle state, from GitLab's `state` field. */

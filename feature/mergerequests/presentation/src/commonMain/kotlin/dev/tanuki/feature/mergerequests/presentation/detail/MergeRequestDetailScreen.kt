@@ -1,6 +1,8 @@
 package dev.tanuki.feature.mergerequests.presentation.detail
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,6 +10,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
@@ -60,10 +64,13 @@ import dev.tanuki.core.designsystem.FileDiffView
 import dev.tanuki.core.designsystem.TanukiTheme
 import dev.tanuki.core.domain.diff.DiffLine
 import dev.tanuki.core.presentation.ObserveAsEvents
+import dev.tanuki.feature.mergerequests.domain.ApprovalInfo
 import dev.tanuki.feature.mergerequests.domain.Discussion
 import dev.tanuki.feature.mergerequests.domain.DiscussionNote
 import dev.tanuki.feature.mergerequests.domain.MergeRequest
 import dev.tanuki.feature.mergerequests.domain.MergeStatus
+import dev.tanuki.feature.mergerequests.domain.MrCommit
+import dev.tanuki.feature.mergerequests.domain.MrPipeline
 import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownTypography
@@ -71,6 +78,7 @@ import dev.tanuki.feature.mergerequests.presentation.relativeTime
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Clock
+import kotlin.time.Instant
 
 @Composable
 fun MergeRequestDetailRoot(
@@ -102,6 +110,7 @@ fun MergeRequestDetailRoot(
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MergeRequestDetailScreen(
     state: MergeRequestDetailState,
@@ -113,6 +122,7 @@ fun MergeRequestDetailScreen(
     var showComposer by remember { mutableStateOf(false) }
     var selectedTab by rememberSaveable { mutableStateOf(0) }
     val commenting = state.inSelectionMode && selectedTab == 3
+    val now = remember { Clock.System.now() }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -141,25 +151,39 @@ fun MergeRequestDetailScreen(
                 }
                 state.mergeRequest != null -> {
                     val mr = state.mergeRequest
-                    Header(mr, state.totalAdditions, state.totalDeletions, state.diffs.size)
-                    MrTabs(
-                        selected = selectedTab,
-                        overviewCount = state.threadCount,
-                        commitCount = state.commits.size,
-                        pipelineCount = state.pipelines.size,
-                        changeCount = state.diffs.size,
-                        onSelect = { selectedTab = it },
-                    )
-                    if (commenting) {
-                        SelectionBar(state.selectedCount) { onAction(MergeRequestDetailAction.OnCancelSelection) }
-                    }
+                    val listState = rememberLazyListState()
                     Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                        when (selectedTab) {
-                            1 -> CommitsTab(state)
-                            2 -> PipelinesTab(state)
-                            3 -> ChangesTab(state, onAction)
-                            else -> OverviewTab(mr, state, onAction)
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(bottom = 96.dp),
+                        ) {
+                            item(key = "header") {
+                                Header(mr, state.totalAdditions, state.totalDeletions, state.diffs.size, state.approvals)
+                            }
+                            stickyHeader(key = "tabs") {
+                                Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
+                                    MrTabs(
+                                        selected = selectedTab,
+                                        overviewCount = state.threadCount,
+                                        commitCount = state.commits.size,
+                                        pipelineCount = state.pipelines.size,
+                                        changeCount = state.diffs.size,
+                                        onSelect = { selectedTab = it },
+                                    )
+                                    if (commenting) {
+                                        SelectionBar(state.selectedCount) { onAction(MergeRequestDetailAction.OnCancelSelection) }
+                                    }
+                                }
+                            }
+                            when (selectedTab) {
+                                1 -> commitItems(state, now)
+                                2 -> pipelineItems(state, now)
+                                3 -> changeItems(state, onAction)
+                                else -> overviewItems(mr, state, onAction)
+                            }
                         }
+                        if (selectedTab == 3) DiffScrollbar(listState, Modifier.align(Alignment.CenterEnd))
                         SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
                     }
                 }
@@ -217,150 +241,145 @@ private fun MrTab(label: String, count: Int, selected: Boolean, onClick: () -> U
     )
 }
 
-@Composable
-private fun OverviewTab(
+private fun LazyListScope.overviewItems(
     mr: MergeRequest,
     state: MergeRequestDetailState,
     onAction: (MergeRequestDetailAction) -> Unit,
 ) {
     val threads = state.discussions.filter { it.notes.any { n -> !n.system } }
-    LazyColumn(contentPadding = PaddingValues(bottom = 96.dp)) {
-        mr.description?.takeIf { it.isNotBlank() }?.let { desc ->
-            item {
-                Description(
-                    markdown = desc,
-                    projectBaseUrl = mr.webUrl.substringBefore("/-/"),
-                    projectId = mr.projectId,
-                    authToken = state.accessToken,
-                )
-            }
+    mr.description?.takeIf { it.isNotBlank() }?.let { desc ->
+        item(key = "desc") {
+            Description(
+                markdown = desc,
+                projectBaseUrl = mr.webUrl.substringBefore("/-/"),
+                projectId = mr.projectId,
+                authToken = state.accessToken,
+            )
         }
-        if (threads.isNotEmpty()) item { ActivityHeader() }
-        items(count = threads.size, key = { "t-${threads[it].id}" }) { i ->
-            DiscussionRow(threads[i]) { onAction(MergeRequestDetailAction.OnOpenThread(threads[i])) }
-        }
-        if (mr.description.isNullOrBlank() && threads.isEmpty()) {
-            item { EmptyTab("Nothing here yet.") }
-        }
+    }
+    if (threads.isNotEmpty()) item(key = "act-header") { ActivityHeader() }
+    items(count = threads.size, key = { "t-${threads[it].id}" }) { i ->
+        DiscussionRow(threads[i]) { onAction(MergeRequestDetailAction.OnOpenThread(threads[i])) }
+    }
+    if (mr.description.isNullOrBlank() && threads.isEmpty()) {
+        item { EmptyTab("Nothing here yet.") }
     }
 }
 
-@Composable
-private fun ChangesTab(state: MergeRequestDetailState, onAction: (MergeRequestDetailAction) -> Unit) {
+private fun LazyListScope.changeItems(
+    state: MergeRequestDetailState,
+    onAction: (MergeRequestDetailAction) -> Unit,
+) {
     if (state.diffs.isEmpty()) {
-        EmptyTab("No changes.")
+        item { EmptyTab("No changes.") }
         return
     }
-    val listState = rememberLazyListState()
-    Box(Modifier.fillMaxSize()) {
-        LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 96.dp)) {
-            items(count = state.diffs.size, key = { index -> state.diffs[index].newPath + index }) { index ->
-                val file = state.diffs[index]
-                FileDiffView(
-                    file = file,
-                    onLineLongPress = { line ->
-                        onAction(
-                            MergeRequestDetailAction.OnStartSelection(
-                                file.newPath, file.oldPath, line.newLine, line.oldLine,
-                            ),
-                        )
-                    },
-                    onLineClick = { line ->
-                        if (state.inSelectionMode) {
-                            onAction(
-                                MergeRequestDetailAction.OnToggleLine(
-                                    file.newPath, file.oldPath, line.newLine, line.oldLine,
-                                ),
-                            )
-                        } else {
-                            discussionForLine(state, file.newPath, file.oldPath, line)?.let {
-                                onAction(MergeRequestDetailAction.OnOpenThread(it))
-                            }
-                        }
-                    },
-                    isLineSelected = { line -> lineSelected(state, file.newPath, line) },
-                    lineHasComment = { line -> discussionForLine(state, file.newPath, file.oldPath, line) != null },
+    items(count = state.diffs.size, key = { index -> state.diffs[index].newPath + index }) { index ->
+        val file = state.diffs[index]
+        FileDiffView(
+            file = file,
+            onLineLongPress = { line ->
+                onAction(
+                    MergeRequestDetailAction.OnStartSelection(
+                        file.newPath, file.oldPath, line.newLine, line.oldLine,
+                    ),
                 )
-            }
-        }
-        DiffScrollbar(listState, Modifier.align(Alignment.CenterEnd))
+            },
+            onLineClick = { line ->
+                if (state.inSelectionMode) {
+                    onAction(
+                        MergeRequestDetailAction.OnToggleLine(
+                            file.newPath, file.oldPath, line.newLine, line.oldLine,
+                        ),
+                    )
+                } else {
+                    discussionForLine(state, file.newPath, file.oldPath, line)?.let {
+                        onAction(MergeRequestDetailAction.OnOpenThread(it))
+                    }
+                }
+            },
+            isLineSelected = { line -> lineSelected(state, file.newPath, line) },
+            lineHasComment = { line -> discussionForLine(state, file.newPath, file.oldPath, line) != null },
+        )
     }
 }
 
-@Composable
-private fun CommitsTab(state: MergeRequestDetailState) {
+private fun LazyListScope.commitItems(state: MergeRequestDetailState, now: Instant) {
     if (state.commits.isEmpty()) {
-        EmptyTab("No commits.")
+        item { EmptyTab("No commits.") }
         return
     }
-    val now = remember { Clock.System.now() }
-    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        items(count = state.commits.size, key = { state.commits[it].shortId + it }) { i ->
-            val c = state.commits[i]
-            Column(
-                Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                    .padding(12.dp),
-            ) {
-                Text(c.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Row(modifier = Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(c.shortId, style = MaterialTheme.typography.labelMedium, fontFamily = CodeFontFamily, color = MaterialTheme.colorScheme.primary)
-                    Text(
-                        (c.authorName?.let { "$it · " } ?: "") + relativeTime(c.createdAt, now),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
+    items(count = state.commits.size, key = { state.commits[it].shortId + it }) { i ->
+        CommitCard(state.commits[i], now)
+    }
+}
+
+private fun LazyListScope.pipelineItems(state: MergeRequestDetailState, now: Instant) {
+    if (state.pipelines.isEmpty()) {
+        item { EmptyTab("No pipelines.") }
+        return
+    }
+    items(count = state.pipelines.size, key = { state.pipelines[it].id }) { i ->
+        PipelineCard(state.pipelines[i], now)
+    }
+}
+
+@Composable
+private fun CommitCard(c: MrCommit, now: Instant) {
+    Column(
+        Modifier.fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 5.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .padding(12.dp),
+    ) {
+        Text(c.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Row(modifier = Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(c.shortId, style = MaterialTheme.typography.labelMedium, fontFamily = CodeFontFamily, color = MaterialTheme.colorScheme.primary)
+            Text(
+                (c.authorName?.let { "$it · " } ?: "") + relativeTime(c.createdAt, now),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
 
 @Composable
-private fun PipelinesTab(state: MergeRequestDetailState) {
-    if (state.pipelines.isEmpty()) {
-        EmptyTab("No pipelines.")
-        return
+private fun PipelineCard(p: MrPipeline, now: Instant) {
+    val color = when (p.status) {
+        "success" -> TanukiTheme.colors.success
+        "failed" -> MaterialTheme.colorScheme.error
+        "running", "pending", "created" -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-    val now = remember { Clock.System.now() }
-    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        items(count = state.pipelines.size, key = { state.pipelines[it].id }) { i ->
-            val p = state.pipelines[i]
-            val color = when (p.status) {
-                "success" -> TanukiTheme.colors.success
-                "failed" -> MaterialTheme.colorScheme.error
-                "running", "pending", "created" -> MaterialTheme.colorScheme.primary
-                else -> MaterialTheme.colorScheme.onSurfaceVariant
-            }
-            Row(
-                Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Box(Modifier.size(10.dp).clip(RoundedCornerShape(5.dp)).background(color))
-                Column(Modifier.weight(1f)) {
-                    Text(p.ref, style = MaterialTheme.typography.bodyMedium, fontFamily = CodeFontFamily, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(
-                        "#${p.id} · ${p.status} · ${relativeTime(p.createdAt, now)}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                    )
-                }
-            }
+    Row(
+        Modifier.fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 5.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(Modifier.size(10.dp).clip(RoundedCornerShape(5.dp)).background(color))
+        Column(Modifier.weight(1f)) {
+            Text(p.ref, style = MaterialTheme.typography.bodyMedium, fontFamily = CodeFontFamily, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                "#${p.id} · ${p.status} · ${relativeTime(p.createdAt, now)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
         }
     }
 }
 
 @Composable
 private fun EmptyTab(text: String) {
-    Box(Modifier.fillMaxSize(), Alignment.Center) {
+    Box(Modifier.fillMaxWidth().padding(vertical = 48.dp), Alignment.Center) {
         Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -655,51 +674,196 @@ private fun DiscussionRow(discussion: Discussion, onClick: () -> Unit) {
 }
 
 @Composable
-private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: Int) {
+private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: Int, approvals: ApprovalInfo?) {
+    val now = remember { Clock.System.now() }
+    val cardShape = RoundedCornerShape(12.dp)
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
-        Text(
-            text = mr.title,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-        )
-        Row(
-            modifier = Modifier.padding(top = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(cardShape)
+                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, cardShape)
+                .padding(16.dp),
         ) {
-            StatusPill(mr.status)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                StateBadge(mr)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    text = "!${mr.iid} · Updated ${relativeTime(mr.updatedAt, now)}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Text(
-                text = "${mr.reference} · ${mr.authorName}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = mr.title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 12.dp),
             )
+            Row(
+                modifier = Modifier.padding(top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                BranchChip(mr.sourceBranch, Modifier.weight(1f, fill = false))
+                Text("→", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                BranchChip(mr.targetBranch, Modifier.weight(1f, fill = false))
+            }
+            HorizontalDivider(
+                modifier = Modifier.padding(top = 14.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+            )
+            Row(
+                modifier = Modifier.padding(top = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                InitialsAvatar(mr.authorName)
+                Column {
+                    Text(mr.authorName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                    Text("Author", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+
+            if (mr.reviewers.isNotEmpty() || approvals != null) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(top = 14.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                )
+                val approvedNames = approvals?.approvedBy?.map { it.name }?.toSet() ?: emptySet()
+                if (mr.reviewers.isNotEmpty()) {
+                    Text(
+                        "Reviewers",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+                    mr.reviewers.forEach { reviewer ->
+                        Row(
+                            modifier = Modifier.padding(top = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            InitialsAvatar(reviewer.name, size = 28)
+                            Text(reviewer.name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            if (reviewer.name in approvedNames) {
+                                ApprovalTag("Approved", TanukiTheme.colors.success)
+                            } else {
+                                ApprovalTag("Pending", MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+                approvals?.let { a ->
+                    val (text, color) = when {
+                        a.approved -> "Approved" to TanukiTheme.colors.success
+                        a.approvalsRequired > 0 -> "${a.approvalsLeft} of ${a.approvalsRequired} approvals left" to MaterialTheme.colorScheme.primary
+                        a.approvedBy.isNotEmpty() -> "Approved by ${a.approvedBy.size}" to TanukiTheme.colors.success
+                        else -> "No approvals yet" to MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                    Row(
+                        modifier = Modifier.padding(top = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(if (a.approved) "✓" else "•", color = color, fontWeight = FontWeight.Bold)
+                        Text(text, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium, color = color)
+                    }
+                }
+            }
         }
+
+        Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatTile("+$additions", "Additions", TanukiTheme.colors.diffAddedAccent)
+            StatTile("−$deletions", "Deletions", TanukiTheme.colors.diffRemovedAccent)
+            StatTile("$fileCount", "Files", MaterialTheme.colorScheme.onSurface)
+        }
+    }
+}
+
+@Composable
+private fun StateBadge(mr: MergeRequest) {
+    val (label, color) = when {
+        mr.isDraft -> "DRAFT" to MaterialTheme.colorScheme.outline
+        mr.state == dev.tanuki.feature.mergerequests.domain.MergeRequestState.MERGED -> "MERGED" to MaterialTheme.colorScheme.secondary
+        mr.state == dev.tanuki.feature.mergerequests.domain.MergeRequestState.CLOSED -> "CLOSED" to MaterialTheme.colorScheme.error
+        else -> "OPEN" to TanukiTheme.colors.success
+    }
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(percent = 50))
+            .background(color.copy(alpha = 0.16f))
+            .padding(horizontal = 10.dp, vertical = 3.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = color)
+    }
+}
+
+@Composable
+private fun BranchChip(name: String, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+            .padding(horizontal = 8.dp, vertical = 5.dp),
+    ) {
         Text(
-            text = "${mr.sourceBranch} → ${mr.targetBranch}",
-            style = MaterialTheme.typography.bodySmall,
+            text = name,
+            style = MaterialTheme.typography.labelMedium,
             fontFamily = CodeFontFamily,
-            color = MaterialTheme.colorScheme.secondary,
-            modifier = Modifier.padding(top = 10.dp),
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
-        Row(modifier = Modifier.padding(top = 10.dp)) {
-            Text(
-                text = "+$additions",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = TanukiTheme.colors.diffAddedAccent,
-            )
-            Text(
-                text = " −$deletions",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = TanukiTheme.colors.diffRemovedAccent,
-            )
-            Text(
-                text = " · $fileCount " + if (fileCount == 1) "file" else "files",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+    }
+}
+
+@Composable
+private fun InitialsAvatar(name: String, size: Int = 40) {
+    val initials = name.trim().split(" ", limit = 2).mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("").take(2)
+    Box(
+        modifier = Modifier
+            .size(size.dp)
+            .clip(RoundedCornerShape(if (size >= 40) 10.dp else 8.dp))
+            .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.18f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = initials.ifEmpty { "?" },
+            style = if (size >= 40) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.tertiary,
+        )
+    }
+}
+
+@Composable
+private fun ApprovalTag(text: String, color: androidx.compose.ui.graphics.Color) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(percent = 50))
+            .background(color.copy(alpha = 0.16f))
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+    ) {
+        Text(text, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium, color = color)
+    }
+}
+
+@Composable
+private fun RowScope.StatTile(value: String, label: String, valueColor: androidx.compose.ui.graphics.Color) {
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+            .padding(vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = valueColor)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
     }
 }
 

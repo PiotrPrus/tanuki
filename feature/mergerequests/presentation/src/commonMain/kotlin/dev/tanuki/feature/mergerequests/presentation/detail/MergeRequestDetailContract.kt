@@ -2,6 +2,7 @@ package dev.tanuki.feature.mergerequests.presentation.detail
 
 import dev.tanuki.core.domain.diff.FileDiff
 import dev.tanuki.core.presentation.UiText
+import dev.tanuki.feature.mergerequests.domain.ApprovalInfo
 import dev.tanuki.feature.mergerequests.domain.Discussion
 import dev.tanuki.feature.mergerequests.domain.MergeRequest
 import dev.tanuki.feature.mergerequests.domain.MrCommit
@@ -43,6 +44,7 @@ data class MergeRequestDetailState(
     val isThreadBusy: Boolean = false,
     val commits: List<MrCommit> = emptyList(),
     val pipelines: List<MrPipeline> = emptyList(),
+    val approvals: ApprovalInfo? = null,
 ) {
     val totalAdditions: Int get() = diffs.sumOf { it.additions }
     val totalDeletions: Int get() = diffs.sumOf { it.deletions }

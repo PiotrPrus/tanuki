@@ -23,6 +23,7 @@ data class MergeRequestDto(
     val author: AuthorDto,
     val references: ReferencesDto? = null,
     @SerialName("diff_refs") val diffRefs: DiffRefsDto? = null,
+    val reviewers: List<AuthorDto> = emptyList(),
 )
 
 @Serializable
