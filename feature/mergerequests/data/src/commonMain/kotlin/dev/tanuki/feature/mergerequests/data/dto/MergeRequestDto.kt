@@ -19,11 +19,21 @@ data class MergeRequestDto(
     @SerialName("user_notes_count") val userNotesCount: Int = 0,
     @SerialName("detailed_merge_status") val detailedMergeStatus: String? = null,
     @SerialName("blocking_discussions_resolved") val blockingDiscussionsResolved: Boolean = true,
+    @SerialName("rebase_in_progress") val rebaseInProgress: Boolean = false,
+    @SerialName("merge_error") val mergeError: String? = null,
+    @SerialName("diverged_commits_count") val divergedCommitsCount: Int? = null,
+    @SerialName("head_pipeline") val headPipeline: HeadPipelineDto? = null,
     @SerialName("updated_at") val updatedAt: String,
     val author: AuthorDto,
     val references: ReferencesDto? = null,
     @SerialName("diff_refs") val diffRefs: DiffRefsDto? = null,
     val reviewers: List<AuthorDto> = emptyList(),
+)
+
+@Serializable
+data class HeadPipelineDto(
+    val status: String? = null,
+    @SerialName("web_url") val webUrl: String? = null,
 )
 
 @Serializable

@@ -20,6 +20,10 @@ interface MergeRequestRepository {
 
     suspend fun approve(projectId: Long, iid: Long): EmptyResult<DataError.Remote>
     suspend fun merge(projectId: Long, iid: Long): EmptyResult<DataError.Remote>
+
+    /** Rebase the MR's source branch onto its target. Async on GitLab's side ([MergeRequest.rebaseInProgress]). */
+    suspend fun rebase(projectId: Long, iid: Long, skipCi: Boolean): EmptyResult<DataError.Remote>
+
     suspend fun comment(projectId: Long, iid: Long, body: String): EmptyResult<DataError.Remote>
 
     /** All discussions (threads) on the MR, incl. diff-anchored ones. */

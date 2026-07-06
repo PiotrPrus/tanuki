@@ -40,6 +40,10 @@ fun MergeRequestDto.toMergeRequest(): MergeRequest = MergeRequest(
         }
     },
     reviewers = reviewers.map { MrUser(name = it.name, avatarUrl = it.avatarUrl) },
+    headPipelineStatus = headPipeline?.status,
+    rebaseInProgress = rebaseInProgress,
+    mergeError = mergeError,
+    commitsBehind = divergedCommitsCount,
 )
 
 private fun String?.toMergeStatus(isDraft: Boolean, hasConflicts: Boolean): MergeStatus = when {

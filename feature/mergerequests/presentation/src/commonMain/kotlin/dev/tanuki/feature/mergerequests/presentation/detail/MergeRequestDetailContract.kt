@@ -45,10 +45,11 @@ data class MergeRequestDetailState(
     val commits: List<MrCommit> = emptyList(),
     val pipelines: List<MrPipeline> = emptyList(),
     val approvals: ApprovalInfo? = null,
+    val isRebasing: Boolean = false,
 ) {
     val totalAdditions: Int get() = diffs.sumOf { it.additions }
     val totalDeletions: Int get() = diffs.sumOf { it.deletions }
-    val actionInProgress: Boolean get() = isApproving || isMerging || isCommenting
+    val actionInProgress: Boolean get() = isApproving || isMerging || isCommenting || isRebasing
     val inSelectionMode: Boolean get() = selection != null
     val selectedCount: Int get() = selection?.lines?.size ?: 0
     /** Count of user (non-system) threads — shown on the Overview tab. */
@@ -60,6 +61,7 @@ sealed interface MergeRequestDetailAction {
     data object OnOpenInBrowser : MergeRequestDetailAction
     data object OnApprove : MergeRequestDetailAction
     data object OnMerge : MergeRequestDetailAction
+    data class OnRebase(val skipCi: Boolean = false) : MergeRequestDetailAction
     data class OnCommentChange(val value: String) : MergeRequestDetailAction
     data object OnSendComment : MergeRequestDetailAction
 

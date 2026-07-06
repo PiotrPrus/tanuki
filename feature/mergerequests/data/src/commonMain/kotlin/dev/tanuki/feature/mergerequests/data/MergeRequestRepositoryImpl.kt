@@ -82,6 +82,13 @@ class MergeRequestRepositoryImpl(
             httpClient.put("projects/$projectId/merge_requests/$iid/merge")
         }
 
+    override suspend fun rebase(projectId: Long, iid: Long, skipCi: Boolean): EmptyResult<DataError.Remote> =
+        safeCallEmpty {
+            httpClient.put("projects/$projectId/merge_requests/$iid/rebase") {
+                if (skipCi) parameter("skip_ci", true)
+            }
+        }
+
     override suspend fun comment(
         projectId: Long,
         iid: Long,
