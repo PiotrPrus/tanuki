@@ -61,7 +61,9 @@ internal val TanukiLightColorScheme = lightColorScheme(
 // Deep-space indigo surfaces, peach-orange brand accents, WCAG-AA on dark.
 
 internal val TanukiDarkColorScheme = darkColorScheme(
-    primary = Color(0xFFFFB599),
+    // Vivid brand orange as primary (AA-compliant on dark per DESIGN.md) so links, selected
+    // states, and filled buttons all read the brand color, matching the dark mock.
+    primary = Color(0xFFFF783D),
     onPrimary = Color(0xFF5A1C00),
     primaryContainer = Color(0xFFFF783D),
     onPrimaryContainer = Color(0xFF642000),
