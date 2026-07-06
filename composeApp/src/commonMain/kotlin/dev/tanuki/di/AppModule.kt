@@ -11,6 +11,7 @@ import dev.tanuki.feature.projects.presentation.di.projectsPresentationModule
 import dev.tanuki.navigation.DeepLinkHandler
 import dev.tanuki.navigation.DefaultDeepLinkHandler
 import org.koin.core.context.startKoin
+import org.koin.core.module.Module
 import org.koin.dsl.KoinAppDeclaration
 import org.koin.dsl.module
 
@@ -18,11 +19,15 @@ val appModule = module {
     single<DeepLinkHandler> { DefaultDeepLinkHandler() }
 }
 
+/** Provides [dev.tanuki.navigation.AppLinkController] — the platform "open supported links" hook. */
+expect val platformAppModule: Module
+
 fun initKoin(config: KoinAppDeclaration? = null) {
     startKoin {
         config?.invoke(this)
         modules(
             appModule,
+            platformAppModule,
             coreDataModule,
             platformCoreDataModule,
             authDataModule,

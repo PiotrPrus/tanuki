@@ -1,30 +1,47 @@
 package dev.tanuki
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.MergeType
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -42,6 +59,7 @@ import dev.tanuki.core.designsystem.TanukiTheme
 import dev.tanuki.core.domain.util.Result
 import dev.tanuki.feature.auth.domain.AuthRepository
 import dev.tanuki.feature.projects.domain.ProjectRepository
+import dev.tanuki.navigation.AppLinkController
 import dev.tanuki.navigation.DeepLinkHandler
 import dev.tanuki.navigation.DeepLinkTarget
 import dev.tanuki.feature.auth.presentation.LoginRoot
@@ -121,6 +139,16 @@ private fun AppScaffold(startLoggedIn: Boolean) {
         }
     }
 
+    // One-time prompt to route gitlab.com links to Tanuki. gitlab.com can't be domain-verified,
+    // so Android disables link handling until the user opts in; re-check on resume to hide the
+    // prompt right after they return from the settings screen.
+    val appLinkController = koinInject<AppLinkController>()
+    var linksEnabled by remember { mutableStateOf(appLinkController.areGitLabLinksEnabled()) }
+    var linkPromptDismissed by rememberSaveable { mutableStateOf(false) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        linksEnabled = appLinkController.areGitLabLinksEnabled()
+    }
+
     Scaffold(
         bottomBar = {
             if (destination.isTopLevel()) {
@@ -128,11 +156,18 @@ private fun AppScaffold(startLoggedIn: Boolean) {
             }
         },
     ) { padding ->
-        NavHost(
-            navController = navController,
-            startDestination = if (startLoggedIn) Routes.Projects else Routes.Login,
-            modifier = Modifier.fillMaxSize().padding(padding),
-        ) {
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            if (destination.isTopLevel() && !linksEnabled && !linkPromptDismissed) {
+                LinkHandlingBanner(
+                    onEnable = { appLinkController.openLinkSettings() },
+                    onDismiss = { linkPromptDismissed = true },
+                )
+            }
+            NavHost(
+                navController = navController,
+                startDestination = if (startLoggedIn) Routes.Projects else Routes.Login,
+                modifier = Modifier.fillMaxSize(),
+            ) {
             composable<Routes.Login> {
                 LoginRoot(
                     onLoggedIn = {
@@ -299,12 +334,49 @@ private fun AppScaffold(startLoggedIn: Boolean) {
                     onOpenInBrowser = { url -> uriHandler.openUri(url) },
                 )
             }
+            }
         }
     }
 }
 
 private fun NavDestination?.isTopLevel(): Boolean =
     this?.hasRoute<Routes.Projects>() == true || this?.hasRoute<Routes.Reviews>() == true
+
+/** Prompts the user to route GitLab links to Tanuki, jumping to the system setting on tap. */
+@Composable
+private fun LinkHandlingBanner(onEnable: () -> Unit, onDismiss: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+        shape = MaterialTheme.shapes.medium,
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 4.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(Icons.Filled.Link, contentDescription = null)
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Open GitLab links in Tanuki", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "Turn on \"Open supported links\" so shared merge-request links open here.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                )
+            }
+            TextButton(
+                onClick = onEnable,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ),
+            ) { Text("Enable", fontWeight = FontWeight.Bold) }
+            IconButton(onClick = onDismiss) {
+                Icon(Icons.Filled.Close, contentDescription = "Dismiss")
+            }
+        }
+    }
+}
 
 @Composable
 private fun TanukiBottomBar(navController: NavHostController, destination: NavDestination?) {
