@@ -81,6 +81,11 @@ class ProjectRepositoryImpl(
             }
         }.map { it.toProjectDetail() }
 
+    override suspend fun resolveProjectId(path: String): Result<Long, DataError.Remote> =
+        safeCall<ProjectDto> {
+            httpClient.get("projects/${path.encodeURLParameter()}")
+        }.map { it.id }
+
     override suspend fun getProjectStats(
         projectId: Long,
         defaultBranch: String?,
