@@ -69,6 +69,7 @@ import dev.tanuki.feature.mergerequests.presentation.projectlist.ProjectMergeReq
 import dev.tanuki.feature.projects.presentation.ProjectsRoot
 import dev.tanuki.feature.projects.presentation.branches.ProjectBranchesRoot
 import dev.tanuki.feature.projects.presentation.dashboard.ProjectDashboardRoot
+import dev.tanuki.feature.projects.presentation.groupbrowser.GroupBrowserRoot
 import dev.tanuki.feature.projects.presentation.code.FileViewRoot
 import dev.tanuki.feature.projects.presentation.code.ProjectCodeRoot
 import dev.tanuki.feature.projects.presentation.pipelines.PipelineDetailRoot
@@ -183,6 +184,18 @@ private fun AppScaffold(startLoggedIn: Boolean) {
                     onOpenProject = { projectId, projectName ->
                         navController.navigate(Routes.ProjectDashboard(projectId, projectName))
                     },
+                    onOpenGroup = { fullPath -> navController.openGroup(fullPath) },
+                )
+            }
+            composable<Routes.GroupBrowser> { entry ->
+                val route = entry.toRoute<Routes.GroupBrowser>()
+                GroupBrowserRoot(
+                    groupFullPath = route.groupFullPath,
+                    onBack = { navController.popBackStack() },
+                    onOpenGroup = { fullPath -> navController.openGroup(fullPath) },
+                    onOpenProject = { projectId, projectName ->
+                        navController.navigate(Routes.ProjectDashboard(projectId, projectName))
+                    },
                 )
             }
             composable<Routes.ProjectDashboard> { entry ->
@@ -210,6 +223,7 @@ private fun AppScaffold(startLoggedIn: Boolean) {
                         navController.navigate(Routes.ProjectCode(projectId, projectName, ref, ""))
                     },
                     onOpenInBrowser = { url -> uriHandler.openUri(url) },
+                    onOpenGroup = { fullPath -> navController.openGroup(fullPath) },
                 )
             }
             composable<Routes.ProjectCode> { entry ->
@@ -400,6 +414,21 @@ private fun TanukiBottomBar(navController: NavHostController, destination: NavDe
             label = { Text("Projects") },
             colors = colors,
         )
+    }
+}
+
+/**
+ * Navigate to a group browser hierarchically: if that group is already on the back stack (e.g.
+ * reached via a breadcrumb), collapse to it instead of pushing a duplicate. So Back always walks
+ * up the group path (…/web → …/ → Projects), never replaying the visit history.
+ */
+private fun NavHostController.openGroup(fullPath: String) {
+    // If this group is already on the back stack (e.g. reached via a breadcrumb), pop back to it
+    // — collapsing any detour above it — instead of pushing a duplicate. Otherwise it's a normal
+    // drill-down, so push. Either way, Back walks up the group path, never the visit history.
+    val poppedToExisting = popBackStack(Routes.GroupBrowser(fullPath), inclusive = false)
+    if (!poppedToExisting) {
+        navigate(Routes.GroupBrowser(fullPath))
     }
 }
 

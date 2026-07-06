@@ -11,6 +11,8 @@ data class Project(
     val visibility: Visibility,
     /** "user" or "group" — used to tell personal from shared projects. */
     val namespaceKind: String,
+    /** Whether the current user has starred this project (set by cross-referencing starred ids). */
+    val starred: Boolean = false,
 )
 
 enum class Visibility { PUBLIC, INTERNAL, PRIVATE, UNKNOWN }
