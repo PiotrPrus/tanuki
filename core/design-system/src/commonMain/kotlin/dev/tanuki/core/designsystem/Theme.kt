@@ -1,5 +1,6 @@
 package dev.tanuki.core.designsystem
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -16,12 +17,15 @@ object TanukiTheme {
 
 @Composable
 fun TanukiTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
-    // The design is a light, warm "Almond Cream" system. A dark variant is a follow-up.
-    CompositionLocalProvider(LocalTanukiColors provides TanukiColors()) {
+    // Light: warm "Almond Cream". Dark: "Luminous Hearth" deep-space indigo. Follows the system.
+    val colorScheme = if (darkTheme) TanukiDarkColorScheme else TanukiLightColorScheme
+    val tanukiColors = if (darkTheme) TanukiDarkColors else TanukiLightColors
+    CompositionLocalProvider(LocalTanukiColors provides tanukiColors) {
         MaterialTheme(
-            colorScheme = TanukiLightColorScheme,
+            colorScheme = colorScheme,
             typography = TanukiTypography,
             shapes = TanukiShapes,
             content = content,

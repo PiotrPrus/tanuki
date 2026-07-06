@@ -1,5 +1,6 @@
 package dev.tanuki.core.designsystem
 
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
@@ -56,6 +57,47 @@ internal val TanukiLightColorScheme = lightColorScheme(
     surfaceTint = TanukiOrange,
 )
 
+// --- Tanuki dark palette ("Luminous Hearth Dark" from DESIGN.md) ---
+// Deep-space indigo surfaces, peach-orange brand accents, WCAG-AA on dark.
+
+internal val TanukiDarkColorScheme = darkColorScheme(
+    primary = Color(0xFFFFB599),
+    onPrimary = Color(0xFF5A1C00),
+    primaryContainer = Color(0xFFFF783D),
+    onPrimaryContainer = Color(0xFF642000),
+    inversePrimary = Color(0xFFA63B00),
+    secondary = Color(0xFFB9C8DE),
+    onSecondary = Color(0xFF233143),
+    secondaryContainer = Color(0xFF39485A),
+    onSecondaryContainer = Color(0xFFA7B6CC),
+    tertiary = Color(0xFFFCB973),
+    onTertiary = Color(0xFF492900),
+    tertiaryContainer = Color(0xFFD19351),
+    onTertiaryContainer = Color(0xFF522E00),
+    error = Color(0xFFFFB4AB),
+    onError = Color(0xFF690005),
+    errorContainer = Color(0xFF93000A),
+    onErrorContainer = Color(0xFFFFDAD6),
+    background = Color(0xFF0B1326),
+    onBackground = Color(0xFFDAE2FD),
+    surface = Color(0xFF0B1326),
+    onSurface = Color(0xFFDAE2FD),
+    surfaceVariant = Color(0xFF2D3449),
+    onSurfaceVariant = Color(0xFFE0C0B4),
+    surfaceBright = Color(0xFF31394D),
+    surfaceDim = Color(0xFF0B1326),
+    surfaceContainerLowest = Color(0xFF060E20),
+    surfaceContainerLow = Color(0xFF131B2E),
+    surfaceContainer = Color(0xFF171F33),
+    surfaceContainerHigh = Color(0xFF222A3D),
+    surfaceContainerHighest = Color(0xFF2D3449),
+    outline = Color(0xFFA78B80),
+    outlineVariant = Color(0xFF584239),
+    inverseSurface = Color(0xFFDAE2FD),
+    inverseOnSurface = Color(0xFF283044),
+    surfaceTint = Color(0xFFFFB599),
+)
+
 /**
  * Semantic colors not covered by [androidx.compose.material3.ColorScheme] — currently the
  * diff view. Exposed via [LocalTanukiColors] and `TanukiTheme.colors`.
@@ -69,4 +111,20 @@ data class TanukiColors(
     val diffRemovedAccent: Color = Color(0xFFB3261E),
     val success: Color = Color(0xFF166534),
     val warning: Color = Color(0xFFB08800),
+)
+
+/** Light extended colors (defaults). */
+internal val TanukiLightColors = TanukiColors()
+
+/**
+ * Dark extended colors: subtle dark tints behind diff rows, bright accents for +/− signs
+ * and status, so they stay legible on the deep-space surfaces.
+ */
+internal val TanukiDarkColors = TanukiColors(
+    diffAddedBackground = Color(0xFF13331F),
+    diffAddedAccent = Color(0xFF4ADE80),
+    diffRemovedBackground = Color(0xFF3A191C),
+    diffRemovedAccent = Color(0xFFFB7185),
+    success = Color(0xFF34D399),
+    warning = Color(0xFFFCB973),
 )
