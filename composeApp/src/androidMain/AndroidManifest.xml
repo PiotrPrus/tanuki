@@ -32,6 +32,25 @@
                     android:scheme="dev.tanuki"
                     android:host="oauth-callback" />
             </intent-filter>
+
+            <!-- Open shared GitLab merge-request links in Tanuki, e.g.
+                 https://gitlab.com/<group>/<project>/-/merge_requests/199
+                 Android's path glob is greedy without backtracking, so a single "/.*/-/..."
+                 never matches. Instead we match each path segment with [^/]+ (which can't
+                 cross a slash, so it stops on its own) for the realistic range of project
+                 nesting depths (2 = group/project, up to 6 for deep subgroups). -->
+            <intent-filter android:label="Open in Tanuki">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="gitlab.com" />
+                <data android:scheme="http" android:host="gitlab.com" />
+                <data android:pathAdvancedPattern="/[^/]+/[^/]+/-/merge_requests/[0-9]+.*" />
+                <data android:pathAdvancedPattern="/[^/]+/[^/]+/[^/]+/-/merge_requests/[0-9]+.*" />
+                <data android:pathAdvancedPattern="/[^/]+/[^/]+/[^/]+/[^/]+/-/merge_requests/[0-9]+.*" />
+                <data android:pathAdvancedPattern="/[^/]+/[^/]+/[^/]+/[^/]+/[^/]+/-/merge_requests/[0-9]+.*" />
+                <data android:pathAdvancedPattern="/[^/]+/[^/]+/[^/]+/[^/]+/[^/]+/[^/]+/-/merge_requests/[0-9]+.*" />
+            </intent-filter>
         </activity>
     </application>
 </manifest>

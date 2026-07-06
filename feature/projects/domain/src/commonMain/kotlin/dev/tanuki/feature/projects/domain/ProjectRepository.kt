@@ -11,6 +11,9 @@ interface ProjectRepository {
     /** Full detail for a single project (the dashboard). */
     suspend fun getProject(projectId: Long): Result<ProjectDetail, DataError.Remote>
 
+    /** Resolve a URL path (e.g. `teamtilt/mobile/tiltandroid`) to its numeric project id. */
+    suspend fun resolveProjectId(path: String): Result<Long, DataError.Remote>
+
     /** Best-effort dashboard counts/status (parallel calls; nulls where unavailable). */
     suspend fun getProjectStats(projectId: Long, defaultBranch: String?): ProjectStats
 

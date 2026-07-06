@@ -13,6 +13,7 @@ kotlin {
             implementation(project(":feature:auth:domain"))
             implementation(project(":feature:auth:data"))
             implementation(project(":feature:mergerequests:data"))
+            implementation(project(":feature:projects:domain"))
             implementation(project(":feature:projects:data"))
             implementation(project(":core:domain"))
             implementation(project(":core:data"))

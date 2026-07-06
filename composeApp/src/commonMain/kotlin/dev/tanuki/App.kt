@@ -19,6 +19,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
@@ -38,7 +39,11 @@ import coil3.compose.setSingletonImageLoaderFactory
 import coil3.network.ktor3.KtorNetworkFetcherFactory
 import io.ktor.client.HttpClient
 import dev.tanuki.core.designsystem.TanukiTheme
+import dev.tanuki.core.domain.util.Result
 import dev.tanuki.feature.auth.domain.AuthRepository
+import dev.tanuki.feature.projects.domain.ProjectRepository
+import dev.tanuki.navigation.DeepLinkHandler
+import dev.tanuki.navigation.DeepLinkTarget
 import dev.tanuki.feature.auth.presentation.LoginRoot
 import dev.tanuki.feature.mergerequests.presentation.MergeRequestsRoot
 import dev.tanuki.feature.mergerequests.presentation.detail.MergeRequestDetailRoot
@@ -96,6 +101,25 @@ private fun AppScaffold(startLoggedIn: Boolean) {
     val uriHandler = LocalUriHandler.current
     val currentEntry by navController.currentBackStackEntryAsState()
     val destination = currentEntry?.destination
+
+    // Shared GitLab links (e.g. gitlab.com/group/project/-/merge_requests/199) arrive here.
+    // Resolve the project path to a numeric id, then jump straight to the MR. Resolution needs
+    // an authenticated session, so a link opened while logged out simply lands on the app
+    // (login) without navigating.
+    val deepLinkHandler = koinInject<DeepLinkHandler>()
+    val projectRepository = koinInject<ProjectRepository>()
+    LaunchedEffect(Unit) {
+        deepLinkHandler.targets.collect { target ->
+            when (target) {
+                is DeepLinkTarget.MergeRequest -> {
+                    val resolved = projectRepository.resolveProjectId(target.projectPath)
+                    if (resolved is Result.Success) {
+                        navController.navigate(Routes.MergeRequestDetail(resolved.data, target.iid))
+                    }
+                }
+            }
+        }
+    }
 
     Scaffold(
         bottomBar = {
