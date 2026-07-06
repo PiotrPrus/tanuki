@@ -109,12 +109,20 @@ also be triggered manually via **workflow_dispatch**.
 
 | Secret | Purpose |
 |---|---|
-| `FIREBASE_APP_ID` | Firebase Android app id (`1:…:android:…`) |
-| `FIREBASE_SERVICE_ACCOUNT` | JSON key of a service account with the *Firebase App Distribution Admin* role |
-| `ANDROID_KEYSTORE_BASE64` | *(optional)* base64 of the release keystore — omit to debug-sign |
+| `FIREBASE_APP_ID_ANDROID` | Firebase Android app id (`1:…:android:…`) |
+| `FIREBASE_SERVICE_ACCOUNT_ANDROID_B64` | base64 of a service-account JSON key with the *Firebase App Distribution Admin* role (the workflow also accepts the raw-JSON `FIREBASE_SERVICE_ACCOUNT_ANDROID` as a fallback) |
+| `ANDROID_KEYSTORE_BASE64` | *(optional)* base64 of the release keystore — **omit for now to debug-sign** |
 | `ANDROID_KEYSTORE_PASSWORD` / `ANDROID_KEY_ALIAS` / `ANDROID_KEY_PASSWORD` | *(optional)* keystore credentials |
 
 Optional repo **variable** `FIREBASE_TESTER_GROUPS` overrides the default tester group.
+
+> Until a release keystore is configured, builds are **debug-signed** — fine for internal
+> testing, but note that switching to a real signing key later changes the app signature, so
+> testers will need to uninstall and reinstall.
+
+`composeApp/google-services.json` (Android) and `iosApp/iosApp/GoogleService-Info.plist`
+(iOS) hold the Firebase client config. These are safe to commit — they're client
+identifiers, not secrets (Firebase relies on security rules + API-key restrictions).
 
 > **iOS distribution** via Firebase is planned. iOS uses Ad Hoc distribution, which needs a
 > paid Apple Developer account and each tester's device UDID registered in the provisioning

@@ -53,9 +53,15 @@ jobs:
 
       - name: Write Firebase service account
         env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          SA_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ANDROID_B64 }}
+          SA_RAW: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ANDROID }}
         run: |
-          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-sa.json"
+          # Prefer the base64 secret (avoids JSON newline/escaping issues); fall back to raw JSON.
+          if [ -n "$SA_B64" ]; then
+            echo "$SA_B64" | base64 --decode > "$RUNNER_TEMP/firebase-sa.json"
+          else
+            printf '%s' "$SA_RAW" > "$RUNNER_TEMP/firebase-sa.json"
+          fi
           echo "FIREBASE_SERVICE_ACCOUNT_FILE=$RUNNER_TEMP/firebase-sa.json" >> "$GITHUB_ENV"
 
       - name: Build & distribute
@@ -63,7 +69,7 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID_ANDROID }}
           FIREBASE_TESTER_GROUPS: ${{ vars.FIREBASE_TESTER_GROUPS || 'internal-testers' }}
           FIREBASE_RELEASE_NOTES: "Tanuki ${{ steps.version.outputs.name }} (build ${{ github.run_number }})"
         run: |
