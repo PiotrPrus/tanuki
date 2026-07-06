@@ -23,6 +23,6 @@ sealed interface GroupBrowserAction {
 }
 
 sealed interface GroupBrowserEvent {
-    data class OpenGroup(val fullPath: String, val name: String) : GroupBrowserEvent
+    data class OpenGroup(val fullPath: String) : GroupBrowserEvent
     data class OpenDashboard(val projectId: Long, val projectName: String) : GroupBrowserEvent
 }

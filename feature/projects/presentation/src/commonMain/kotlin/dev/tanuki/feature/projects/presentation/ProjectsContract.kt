@@ -29,5 +29,5 @@ sealed interface ProjectsAction {
 
 sealed interface ProjectsEvent {
     data class OpenDashboard(val projectId: Long, val projectName: String) : ProjectsEvent
-    data class OpenGroup(val fullPath: String, val name: String) : ProjectsEvent
+    data class OpenGroup(val fullPath: String) : ProjectsEvent
 }

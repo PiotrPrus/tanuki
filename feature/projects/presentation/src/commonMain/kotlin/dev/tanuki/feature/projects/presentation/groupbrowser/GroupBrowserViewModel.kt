@@ -28,9 +28,10 @@ class GroupBrowserViewModel(
     private var starredIds: Set<Long> = emptySet()
     private var path: String = ""
 
-    fun load(fullPath: String, title: String) {
+    fun load(fullPath: String) {
         path = fullPath
-        _state.update { it.copy(fullPath = fullPath, title = title) }
+        // Interim title from the path; replaced by the real display name once the group loads.
+        _state.update { it.copy(fullPath = fullPath, title = fullPath.substringAfterLast('/')) }
         reload()
     }
 
@@ -38,13 +39,13 @@ class GroupBrowserViewModel(
         when (action) {
             GroupBrowserAction.OnRetry -> reload()
             is GroupBrowserAction.OnOpenSubgroup -> viewModelScope.launch {
-                _events.send(GroupBrowserEvent.OpenGroup(action.group.fullPath, action.group.name))
+                _events.send(GroupBrowserEvent.OpenGroup(action.group.fullPath))
             }
             is GroupBrowserAction.OnOpenProject -> viewModelScope.launch {
                 _events.send(GroupBrowserEvent.OpenDashboard(action.project.id, action.project.name))
             }
             is GroupBrowserAction.OnOpenGroupPath -> viewModelScope.launch {
-                _events.send(GroupBrowserEvent.OpenGroup(action.fullPath, action.fullPath.substringAfterLast('/')))
+                _events.send(GroupBrowserEvent.OpenGroup(action.fullPath))
             }
             is GroupBrowserAction.OnToggleStar -> toggleStar(action.project)
         }
@@ -55,8 +56,10 @@ class GroupBrowserViewModel(
         viewModelScope.launch {
             val subgroupsDeferred = async { repository.getSubgroups(path) }
             val projectsDeferred = async { repository.getGroupProjects(path) }
+            val groupDeferred = async { repository.getGroup(path) }
             repository.getStarredProjectIds().onSuccess { starredIds = it }
 
+            groupDeferred.await().onSuccess { group -> _state.update { it.copy(title = group.name) } }
             var ok = false
             subgroupsDeferred.await().onSuccess { list -> ok = true; _state.update { it.copy(subgroups = list) } }
             projectsDeferred.await().onSuccess { list ->

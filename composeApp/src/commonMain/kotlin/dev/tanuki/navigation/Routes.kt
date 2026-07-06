@@ -9,9 +9,13 @@ sealed interface Routes {
     @Serializable
     data object Projects : Routes
 
-    /** Browse a group's subgroups and projects. [groupFullPath] is the GitLab path, e.g. "teamtilt/web". */
+    /**
+     * Browse a group's subgroups and projects. [groupFullPath] is the GitLab path, e.g.
+     * "teamtilt/web". Keyed by path only (no title) so re-entering the same group can collapse
+     * the back stack to it — the display name is loaded by the screen.
+     */
     @Serializable
-    data class GroupBrowser(val groupFullPath: String, val title: String) : Routes
+    data class GroupBrowser(val groupFullPath: String) : Routes
 
     @Serializable
     data class ProjectDashboard(val projectId: Long, val projectName: String) : Routes

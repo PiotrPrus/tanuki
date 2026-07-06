@@ -66,7 +66,7 @@ fun ProjectDashboardRoot(
     onOpenPipelines: (projectId: Long, projectName: String) -> Unit,
     onOpenCode: (projectId: Long, projectName: String, ref: String) -> Unit,
     onOpenInBrowser: (url: String) -> Unit,
-    onOpenGroup: (fullPath: String, name: String) -> Unit,
+    onOpenGroup: (fullPath: String) -> Unit,
     viewModel: ProjectDashboardViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -109,7 +109,7 @@ fun ProjectDashboardScreen(
     onOpenReleases: () -> Unit = {},
     onOpenPipelines: () -> Unit = {},
     onOpenCode: (ref: String) -> Unit = {},
-    onOpenGroup: (fullPath: String, name: String) -> Unit = { _, _ -> },
+    onOpenGroup: (fullPath: String) -> Unit = {},
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -158,7 +158,7 @@ private fun DashboardContent(
     onOpenReleases: () -> Unit,
     onOpenPipelines: () -> Unit,
     onOpenCode: (ref: String) -> Unit,
-    onOpenGroup: (fullPath: String, name: String) -> Unit,
+    onOpenGroup: (fullPath: String) -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -168,7 +168,7 @@ private fun DashboardContent(
             VisibilityPill(detail.visibility)
             PathBreadcrumb(
                 pathWithNamespace = detail.pathWithNamespace,
-                onOpenGroup = { path -> onOpenGroup(path, path.substringAfterLast('/')) },
+                onOpenGroup = { path -> onOpenGroup(path) },
                 modifier = Modifier.weight(1f),
             )
         }

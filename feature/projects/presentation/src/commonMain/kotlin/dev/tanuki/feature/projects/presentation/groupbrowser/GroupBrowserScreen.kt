@@ -30,18 +30,17 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun GroupBrowserRoot(
     groupFullPath: String,
-    title: String,
     onBack: () -> Unit,
-    onOpenGroup: (fullPath: String, name: String) -> Unit,
+    onOpenGroup: (fullPath: String) -> Unit,
     onOpenProject: (projectId: Long, projectName: String) -> Unit,
     viewModel: GroupBrowserViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    androidx.compose.runtime.LaunchedEffect(groupFullPath) { viewModel.load(groupFullPath, title) }
+    androidx.compose.runtime.LaunchedEffect(groupFullPath) { viewModel.load(groupFullPath) }
 
     ObserveAsEvents(viewModel.events) { event ->
         when (event) {
-            is GroupBrowserEvent.OpenGroup -> onOpenGroup(event.fullPath, event.name)
+            is GroupBrowserEvent.OpenGroup -> onOpenGroup(event.fullPath)
             is GroupBrowserEvent.OpenDashboard -> onOpenProject(event.projectId, event.projectName)
         }
     }

@@ -43,7 +43,7 @@ class ProjectsViewModel(
                 _events.send(ProjectsEvent.OpenDashboard(action.project.id, action.project.name))
             }
             is ProjectsAction.OnOpenGroup -> viewModelScope.launch {
-                _events.send(ProjectsEvent.OpenGroup(action.group.fullPath, action.group.name))
+                _events.send(ProjectsEvent.OpenGroup(action.group.fullPath))
             }
             is ProjectsAction.OnToggleStar -> toggleStar(action.project)
         }
