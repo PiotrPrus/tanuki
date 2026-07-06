@@ -184,7 +184,6 @@ private fun AppScaffold(startLoggedIn: Boolean) {
                     onOpenProject = { projectId, projectName ->
                         navController.navigate(Routes.ProjectDashboard(projectId, projectName))
                     },
-                    onOpenGroup = { fullPath -> navController.openGroup(fullPath) },
                 )
             }
             composable<Routes.GroupBrowser> { entry ->

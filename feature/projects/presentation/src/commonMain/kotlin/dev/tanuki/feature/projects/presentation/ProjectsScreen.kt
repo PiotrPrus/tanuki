@@ -16,6 +16,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryScrollableTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,15 +27,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.tanuki.core.presentation.ObserveAsEvents
-import dev.tanuki.feature.projects.presentation.components.GroupRow
+import dev.tanuki.feature.projects.domain.ProjectFilter
 import dev.tanuki.feature.projects.presentation.components.ProjectRow
-import dev.tanuki.feature.projects.presentation.components.SectionLabel
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun ProjectsRoot(
     onOpenProject: (projectId: Long, projectName: String) -> Unit,
-    onOpenGroup: (fullPath: String) -> Unit,
     viewModel: ProjectsViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -41,7 +41,6 @@ fun ProjectsRoot(
     ObserveAsEvents(viewModel.events) { event ->
         when (event) {
             is ProjectsEvent.OpenDashboard -> onOpenProject(event.projectId, event.projectName)
-            is ProjectsEvent.OpenGroup -> onOpenGroup(event.fullPath)
         }
     }
 
@@ -54,32 +53,43 @@ fun ProjectsScreen(
     onAction: (ProjectsAction) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)) {
+        Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp)) {
             Text("Projects", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Text(
-                text = if (state.searchMode) {
-                    "${state.searchResults.size} " + if (state.searchResults.size == 1) "result" else "results"
-                } else {
-                    "${state.groups.size} groups · ${state.personalProjects.size} personal"
-                },
+                text = "${state.visibleProjects.size} " +
+                    if (state.visibleProjects.size == 1) "repository" else "repositories",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
+        val tabs = ProjectFilter.entries
+        PrimaryScrollableTabRow(
+            selectedTabIndex = tabs.indexOf(state.filter).coerceAtLeast(0),
+            edgePadding = 12.dp,
+        ) {
+            tabs.forEach { filter ->
+                Tab(
+                    selected = state.filter == filter,
+                    onClick = { onAction(ProjectsAction.OnFilterChange(filter)) },
+                    text = { Text(filter.label(), maxLines = 1, style = MaterialTheme.typography.labelLarge) },
+                )
+            }
+        }
+
         OutlinedTextField(
             value = state.query,
             onValueChange = { onAction(ProjectsAction.OnQueryChange(it)) },
-            label = { Text("Search all projects") },
+            label = { Text("Filter projects") },
             singleLine = true,
             trailingIcon = {
                 if (state.query.isNotEmpty()) {
                     IconButton(onClick = { onAction(ProjectsAction.OnQueryChange("")) }) {
-                        Icon(Icons.Filled.Close, contentDescription = "Clear search")
+                        Icon(Icons.Filled.Close, contentDescription = "Clear filter")
                     }
                 }
             },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
         )
 
         when {
@@ -87,63 +97,31 @@ fun ProjectsScreen(
             state.error != null -> Box(Modifier.fillMaxSize(), Alignment.Center) {
                 Text(state.error.asString(), color = MaterialTheme.colorScheme.error)
             }
-            state.searchMode -> SearchResults(state, onAction)
-            else -> Hierarchy(state, onAction)
-        }
-    }
-}
-
-@Composable
-private fun SearchResults(state: ProjectsState, onAction: (ProjectsAction) -> Unit) {
-    when {
-        state.isSearching && state.searchResults.isEmpty() ->
-            Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-        state.searchResults.isEmpty() ->
-            Box(Modifier.fillMaxSize(), Alignment.Center) {
-                Text("No projects match \"${state.query}\".", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        else -> LazyColumn(
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            items(state.searchResults, key = { it.id }) { project ->
-                ProjectRow(
-                    project = project,
-                    onOpen = { onAction(ProjectsAction.OnOpenProject(project)) },
-                    onToggleStar = { onAction(ProjectsAction.OnToggleStar(project)) },
+            state.visibleProjects.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) {
+                Text(
+                    if (state.query.isBlank()) "No projects here." else "No projects match \"${state.query}\".",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            else -> LazyColumn(
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                items(state.visibleProjects, key = { it.id }) { project ->
+                    ProjectRow(
+                        project = project,
+                        onOpen = { onAction(ProjectsAction.OnOpenProject(project)) },
+                        onToggleStar = { onAction(ProjectsAction.OnToggleStar(project)) },
+                    )
+                }
             }
         }
     }
 }
 
-@Composable
-private fun Hierarchy(state: ProjectsState, onAction: (ProjectsAction) -> Unit) {
-    if (state.groups.isEmpty() && state.personalProjects.isEmpty()) {
-        Box(Modifier.fillMaxSize(), Alignment.Center) {
-            Text("Nothing here yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        return
-    }
-    LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        if (state.groups.isNotEmpty()) {
-            item(key = "groups-label") { SectionLabel("Groups") }
-            items(state.groups, key = { "g-${it.id}" }) { group ->
-                GroupRow(group = group, onOpen = { onAction(ProjectsAction.OnOpenGroup(group)) })
-            }
-        }
-        if (state.personalProjects.isNotEmpty()) {
-            item(key = "personal-label") { SectionLabel("Personal projects") }
-            items(state.personalProjects, key = { "p-${it.id}" }) { project ->
-                ProjectRow(
-                    project = project,
-                    onOpen = { onAction(ProjectsAction.OnOpenProject(project)) },
-                    onToggleStar = { onAction(ProjectsAction.OnToggleStar(project)) },
-                )
-            }
-        }
-    }
+private fun ProjectFilter.label(): String = when (this) {
+    ProjectFilter.RECENT -> "Recent"
+    ProjectFilter.STARRED -> "Starred"
+    ProjectFilter.PERSONAL -> "Personal"
+    ProjectFilter.MEMBER -> "Member"
 }
