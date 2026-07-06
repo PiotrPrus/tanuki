@@ -1,5 +1,6 @@
 [versions]
 agp = "8.11.2"
+firebaseAppDistribution = "5.1.1"
 android-compileSdk = "36"
 android-minSdk = "33"
 android-targetSdk = "36"
@@ -98,3 +99,4 @@ composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "composeMul
 composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlinxSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+firebaseAppDistribution = { id = "com.google.firebase.appdistribution", version.ref = "firebaseAppDistribution" }
