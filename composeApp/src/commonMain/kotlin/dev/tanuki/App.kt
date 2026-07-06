@@ -69,6 +69,7 @@ import dev.tanuki.feature.mergerequests.presentation.projectlist.ProjectMergeReq
 import dev.tanuki.feature.projects.presentation.ProjectsRoot
 import dev.tanuki.feature.projects.presentation.branches.ProjectBranchesRoot
 import dev.tanuki.feature.projects.presentation.dashboard.ProjectDashboardRoot
+import dev.tanuki.feature.projects.presentation.groupbrowser.GroupBrowserRoot
 import dev.tanuki.feature.projects.presentation.code.FileViewRoot
 import dev.tanuki.feature.projects.presentation.code.ProjectCodeRoot
 import dev.tanuki.feature.projects.presentation.pipelines.PipelineDetailRoot
@@ -183,6 +184,23 @@ private fun AppScaffold(startLoggedIn: Boolean) {
                     onOpenProject = { projectId, projectName ->
                         navController.navigate(Routes.ProjectDashboard(projectId, projectName))
                     },
+                    onOpenGroup = { fullPath, name ->
+                        navController.navigate(Routes.GroupBrowser(fullPath, name))
+                    },
+                )
+            }
+            composable<Routes.GroupBrowser> { entry ->
+                val route = entry.toRoute<Routes.GroupBrowser>()
+                GroupBrowserRoot(
+                    groupFullPath = route.groupFullPath,
+                    title = route.title,
+                    onBack = { navController.popBackStack() },
+                    onOpenGroup = { fullPath, name ->
+                        navController.navigate(Routes.GroupBrowser(fullPath, name))
+                    },
+                    onOpenProject = { projectId, projectName ->
+                        navController.navigate(Routes.ProjectDashboard(projectId, projectName))
+                    },
                 )
             }
             composable<Routes.ProjectDashboard> { entry ->
@@ -210,6 +228,9 @@ private fun AppScaffold(startLoggedIn: Boolean) {
                         navController.navigate(Routes.ProjectCode(projectId, projectName, ref, ""))
                     },
                     onOpenInBrowser = { url -> uriHandler.openUri(url) },
+                    onOpenGroup = { fullPath, name ->
+                        navController.navigate(Routes.GroupBrowser(fullPath, name))
+                    },
                 )
             }
             composable<Routes.ProjectCode> { entry ->

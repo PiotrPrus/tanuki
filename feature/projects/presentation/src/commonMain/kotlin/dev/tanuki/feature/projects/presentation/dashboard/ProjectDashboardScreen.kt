@@ -51,6 +51,7 @@ import dev.tanuki.feature.projects.domain.PipelineStatus
 import dev.tanuki.feature.projects.domain.ProjectDetail
 import dev.tanuki.feature.projects.domain.ProjectStats
 import dev.tanuki.feature.projects.domain.Visibility
+import dev.tanuki.feature.projects.presentation.components.PathBreadcrumb
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -65,6 +66,7 @@ fun ProjectDashboardRoot(
     onOpenPipelines: (projectId: Long, projectName: String) -> Unit,
     onOpenCode: (projectId: Long, projectName: String, ref: String) -> Unit,
     onOpenInBrowser: (url: String) -> Unit,
+    onOpenGroup: (fullPath: String, name: String) -> Unit,
     viewModel: ProjectDashboardViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -80,6 +82,7 @@ fun ProjectDashboardRoot(
         onOpenReleases = { onOpenReleases(projectId, projectName) },
         onOpenPipelines = { onOpenPipelines(projectId, projectName) },
         onOpenCode = { ref -> onOpenCode(projectId, projectName, ref) },
+        onOpenGroup = onOpenGroup,
     )
 }
 
@@ -106,6 +109,7 @@ fun ProjectDashboardScreen(
     onOpenReleases: () -> Unit = {},
     onOpenPipelines: () -> Unit = {},
     onOpenCode: (ref: String) -> Unit = {},
+    onOpenGroup: (fullPath: String, name: String) -> Unit = { _, _ -> },
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -128,7 +132,7 @@ fun ProjectDashboardScreen(
                     TextButton(onClick = { onAction(ProjectDashboardAction.OnRetry) }) { Text("Retry") }
                 }
             }
-            state.detail != null -> DashboardContent(state.detail, state.stats, onOpenMergeRequests, onOpenBranches, onOpenTags, onOpenReleases, onOpenPipelines, onOpenCode)
+            state.detail != null -> DashboardContent(state.detail, state.stats, onOpenMergeRequests, onOpenBranches, onOpenTags, onOpenReleases, onOpenPipelines, onOpenCode, onOpenGroup)
         }
     }
 }
@@ -154,19 +158,18 @@ private fun DashboardContent(
     onOpenReleases: () -> Unit,
     onOpenPipelines: () -> Unit,
     onOpenCode: (ref: String) -> Unit,
+    onOpenGroup: (fullPath: String, name: String) -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
     ) {
-        // Breadcrumb + visibility
+        // Breadcrumb + visibility — group segments are tappable, the project segment isn't.
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             VisibilityPill(detail.visibility)
-            Text(
-                text = "/ ${detail.pathWithNamespace.replace("/", " / ")}",
-                style = MaterialTheme.typography.labelMedium,
-                fontFamily = CodeFontFamily,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+            PathBreadcrumb(
+                pathWithNamespace = detail.pathWithNamespace,
+                onOpenGroup = { path -> onOpenGroup(path, path.substringAfterLast('/')) },
+                modifier = Modifier.weight(1f),
             )
         }
         Text(

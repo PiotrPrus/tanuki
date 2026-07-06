@@ -12,6 +12,8 @@ import dev.tanuki.feature.projects.data.dto.BranchDto
 import dev.tanuki.feature.projects.data.dto.BranchMrRefDto
 import dev.tanuki.feature.projects.data.dto.CompareDto
 import dev.tanuki.feature.projects.data.dto.CurrentUserDto
+import dev.tanuki.feature.projects.data.dto.GroupDto
+import dev.tanuki.feature.projects.data.dto.toGroup
 import dev.tanuki.feature.projects.data.dto.CommitDto
 import dev.tanuki.feature.projects.data.dto.JobDto
 import dev.tanuki.feature.projects.data.dto.PipelineDto
@@ -30,6 +32,7 @@ import dev.tanuki.feature.projects.data.dto.toRelease
 import dev.tanuki.feature.projects.data.dto.toRepoEntry
 import dev.tanuki.feature.projects.data.dto.toTag
 import dev.tanuki.feature.projects.domain.Branch
+import dev.tanuki.feature.projects.domain.Group
 import dev.tanuki.feature.projects.domain.Pipeline
 import dev.tanuki.feature.projects.domain.PipelineJob
 import dev.tanuki.feature.projects.domain.PipelineStatus
@@ -73,6 +76,68 @@ class ProjectRepositoryImpl(
                 // "Shared" = projects you're a member of that live under a group (not your own).
                 .filter { filter != ProjectFilter.SHARED || it.namespaceKind == "group" }
         }
+
+    override suspend fun searchProjects(query: String): Result<List<Project>, DataError.Remote> =
+        safeCall<List<ProjectDto>> {
+            httpClient.get("projects") {
+                parameter("membership", true)
+                parameter("search", query)
+                parameter("order_by", "last_activity_at")
+                parameter("per_page", 30)
+            }
+        }.map { dtos -> dtos.map { it.toProject() } }
+
+    override suspend fun getTopLevelGroups(): Result<List<Group>, DataError.Remote> =
+        safeCall<List<GroupDto>> {
+            httpClient.get("groups") {
+                parameter("top_level_only", true)
+                parameter("order_by", "name")
+                parameter("sort", "asc")
+                parameter("per_page", 100)
+            }
+        }.map { dtos -> dtos.map { it.toGroup() } }
+
+    override suspend fun getSubgroups(groupIdOrPath: String): Result<List<Group>, DataError.Remote> =
+        safeCall<List<GroupDto>> {
+            httpClient.get("groups/${groupIdOrPath.encodeURLParameter()}/subgroups") {
+                parameter("order_by", "name")
+                parameter("sort", "asc")
+                parameter("per_page", 100)
+            }
+        }.map { dtos -> dtos.map { it.toGroup() } }
+
+    override suspend fun getGroupProjects(groupIdOrPath: String): Result<List<Project>, DataError.Remote> =
+        safeCall<List<ProjectDto>> {
+            httpClient.get("groups/${groupIdOrPath.encodeURLParameter()}/projects") {
+                parameter("order_by", "name")
+                parameter("sort", "asc")
+                parameter("per_page", 100)
+            }
+        }.map { dtos -> dtos.map { it.toProject() } }
+
+    override suspend fun getGroup(groupIdOrPath: String): Result<Group, DataError.Remote> =
+        safeCall<GroupDto> {
+            httpClient.get("groups/${groupIdOrPath.encodeURLParameter()}")
+        }.map { it.toGroup() }
+
+    override suspend fun getStarredProjectIds(): Result<Set<Long>, DataError.Remote> =
+        safeCall<List<ProjectDto>> {
+            httpClient.get("projects") {
+                parameter("starred", true)
+                parameter("simple", true)
+                parameter("per_page", 100)
+            }
+        }.map { dtos -> dtos.map { it.id }.toSet() }
+
+    override suspend fun starProject(projectId: Long): Result<Project, DataError.Remote> =
+        safeCall<ProjectDto> {
+            httpClient.post("projects/$projectId/star")
+        }.map { it.toProject().copy(starred = true) }
+
+    override suspend fun unstarProject(projectId: Long): Result<Project, DataError.Remote> =
+        safeCall<ProjectDto> {
+            httpClient.post("projects/$projectId/unstar")
+        }.map { it.toProject().copy(starred = false) }
 
     override suspend fun getProject(projectId: Long): Result<ProjectDetail, DataError.Remote> =
         safeCall<ProjectDetailDto> {

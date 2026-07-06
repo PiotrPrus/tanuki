@@ -8,6 +8,30 @@ interface ProjectRepository {
     /** Projects for the given [filter], most recently active first. */
     suspend fun getProjects(filter: ProjectFilter): Result<List<Project>, DataError.Remote>
 
+    /** Flat search across the user's projects by name/path. */
+    suspend fun searchProjects(query: String): Result<List<Project>, DataError.Remote>
+
+    /** Top-level groups the user belongs to. */
+    suspend fun getTopLevelGroups(): Result<List<Group>, DataError.Remote>
+
+    /** Direct subgroups of a group, identified by numeric id or URL path (e.g. "teamtilt/web"). */
+    suspend fun getSubgroups(groupIdOrPath: String): Result<List<Group>, DataError.Remote>
+
+    /** Projects directly in a group (not its subgroups), by numeric id or URL path. */
+    suspend fun getGroupProjects(groupIdOrPath: String): Result<List<Project>, DataError.Remote>
+
+    /** Detail for a single group, by numeric id or URL path (for the browser header). */
+    suspend fun getGroup(groupIdOrPath: String): Result<Group, DataError.Remote>
+
+    /** Ids of the projects the current user has starred (to mark star state in lists). */
+    suspend fun getStarredProjectIds(): Result<Set<Long>, DataError.Remote>
+
+    /** Star [projectId]; returns the updated project. */
+    suspend fun starProject(projectId: Long): Result<Project, DataError.Remote>
+
+    /** Unstar [projectId]; returns the updated project. */
+    suspend fun unstarProject(projectId: Long): Result<Project, DataError.Remote>
+
     /** Full detail for a single project (the dashboard). */
     suspend fun getProject(projectId: Long): Result<ProjectDetail, DataError.Remote>
 
