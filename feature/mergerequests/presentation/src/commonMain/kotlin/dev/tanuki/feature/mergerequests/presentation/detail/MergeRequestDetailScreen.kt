@@ -68,6 +68,7 @@ import dev.tanuki.feature.mergerequests.domain.ApprovalInfo
 import dev.tanuki.feature.mergerequests.domain.Discussion
 import dev.tanuki.feature.mergerequests.domain.DiscussionNote
 import dev.tanuki.feature.mergerequests.domain.MergeRequest
+import dev.tanuki.feature.mergerequests.domain.MergeRequestState
 import dev.tanuki.feature.mergerequests.domain.MergeStatus
 import dev.tanuki.feature.mergerequests.domain.MrCommit
 import dev.tanuki.feature.mergerequests.domain.MrPipeline
@@ -247,6 +248,7 @@ private fun LazyListScope.overviewItems(
     onAction: (MergeRequestDetailAction) -> Unit,
 ) {
     val threads = state.discussions.filter { it.notes.any { n -> !n.system } }
+    item(key = "merge-widget") { MergeWidget(state, onAction) }
     mr.description?.takeIf { it.isNotBlank() }?.let { desc ->
         item(key = "desc") {
             Description(
@@ -448,17 +450,7 @@ private fun ReviewSheet(
             ) {
                 Text(if (state.approved) "Approved ✓" else "Approve")
             }
-            Button(
-                onClick = {
-                    onAction(MergeRequestDetailAction.OnMerge)
-                    onDismiss()
-                },
-                enabled = !state.actionInProgress,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-            ) {
-                Text("Merge")
-            }
+            // Merge/Rebase now live in the merge widget on the Overview tab.
         }
     }
 }
@@ -967,6 +959,120 @@ private fun processText(text: String, host: String, projectBaseUrl: String, proj
 private fun toApiUploadUrl(url: String, host: String, projectId: Long): String {
     val m = UPLOAD_PATH.find(url) ?: return url
     return "$host/api/v4/projects/$projectId/uploads/${m.groupValues[1]}/${m.groupValues[2]}"
+}
+
+/**
+ * The merge widget on the Overview tab: head-pipeline status, the merge status line, and the
+ * contextual REBASE / MERGE action. Only shown while the MR is open.
+ */
+@Composable
+private fun MergeWidget(state: MergeRequestDetailState, onAction: (MergeRequestDetailAction) -> Unit) {
+    val mr = state.mergeRequest ?: return
+    if (mr.state != MergeRequestState.OPEN) return
+    val shape = RoundedCornerShape(12.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        mr.headPipelineStatus?.let { status ->
+            MergeStatusLine("Checks", status.replaceFirstChar { it.uppercase() }, pipelineStatusColor(status))
+        }
+
+        val (label, color) = mergeStatusLabel(mr.status)
+        MergeStatusLine("Merge", label, color)
+        mergeStatusDetail(mr)?.let { detail ->
+            Text(detail, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        when (mr.status) {
+            MergeStatus.MERGEABLE -> MergeActionButton(
+                text = "Merge",
+                container = TanukiTheme.colors.success,
+                loading = state.isMerging,
+                enabled = !state.actionInProgress,
+                onClick = { onAction(MergeRequestDetailAction.OnMerge) },
+            )
+            MergeStatus.NEEDS_REBASE -> MergeActionButton(
+                text = "Rebase",
+                container = TanukiTheme.colors.warning,
+                loading = state.isRebasing,
+                enabled = !state.actionInProgress,
+                onClick = { onAction(MergeRequestDetailAction.OnRebase()) },
+            )
+            else -> Unit
+        }
+    }
+}
+
+@Composable
+private fun MergeStatusLine(label: String, value: String, valueColor: androidx.compose.ui.graphics.Color) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.size(8.dp).clip(RoundedCornerShape(4.dp)).background(valueColor))
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.weight(1f))
+        Text(value, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = valueColor)
+    }
+}
+
+@Composable
+private fun MergeActionButton(
+    text: String,
+    container: androidx.compose.ui.graphics.Color,
+    loading: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled && !loading,
+        colors = ButtonDefaults.buttonColors(containerColor = container),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        if (loading) {
+            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+        } else {
+            Text(text)
+        }
+    }
+}
+
+@Composable
+private fun pipelineStatusColor(status: String) = when (status) {
+    "success" -> TanukiTheme.colors.success
+    "failed", "canceled" -> MaterialTheme.colorScheme.error
+    "running", "pending", "created" -> MaterialTheme.colorScheme.primary
+    else -> MaterialTheme.colorScheme.onSurfaceVariant
+}
+
+@Composable
+private fun mergeStatusLabel(status: MergeStatus): Pair<String, androidx.compose.ui.graphics.Color> = when (status) {
+    MergeStatus.MERGEABLE -> "Ready to merge" to TanukiTheme.colors.success
+    MergeStatus.NEEDS_REBASE -> "Needs rebase" to TanukiTheme.colors.warning
+    MergeStatus.DISCUSSIONS_UNRESOLVED -> "Unresolved threads" to MaterialTheme.colorScheme.error
+    MergeStatus.CI_RUNNING -> "Checks running" to MaterialTheme.colorScheme.secondary
+    MergeStatus.CONFLICTS -> "Merge conflicts" to MaterialTheme.colorScheme.error
+    MergeStatus.DRAFT -> "Marked as draft" to MaterialTheme.colorScheme.onSurfaceVariant
+    MergeStatus.BLOCKED -> "Blocked" to MaterialTheme.colorScheme.error
+    MergeStatus.UNKNOWN -> "Checking…" to MaterialTheme.colorScheme.onSurfaceVariant
+}
+
+private fun mergeStatusDetail(mr: MergeRequest): String? = when (mr.status) {
+    MergeStatus.NEEDS_REBASE -> mr.commitsBehind
+        ?.takeIf { it > 0 }
+        ?.let { "$it commit${if (it == 1) "" else "s"} behind ${mr.targetBranch} — rebase to fast-forward" }
+        ?: "Rebase onto ${mr.targetBranch} to fast-forward"
+    MergeStatus.DISCUSSIONS_UNRESOLVED -> "Resolve all open threads to merge"
+    MergeStatus.CONFLICTS -> "Resolve conflicts on GitLab, then rebase"
+    MergeStatus.CI_RUNNING -> "Merge once the pipeline passes"
+    MergeStatus.DRAFT -> "Mark ready (remove Draft) to merge"
+    MergeStatus.BLOCKED -> "Needs approval or a passing pipeline"
+    else -> null
 }
 
 @Composable

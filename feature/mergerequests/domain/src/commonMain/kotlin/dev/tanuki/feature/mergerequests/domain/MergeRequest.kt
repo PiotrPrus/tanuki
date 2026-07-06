@@ -23,6 +23,14 @@ data class MergeRequest(
     val updatedAt: Instant,
     val diffRefs: DiffRefs?,
     val reviewers: List<MrUser>,
+    /** Status of the MR's head pipeline (e.g. "success", "running", "failed"), if any. */
+    val headPipelineStatus: String?,
+    /** True while a rebase requested through the API is still running. */
+    val rebaseInProgress: Boolean,
+    /** Error from the last merge/rebase attempt, if any. */
+    val mergeError: String?,
+    /** How many commits the source branch is behind the target (null if unknown). */
+    val commitsBehind: Int?,
 )
 
 /** The MR's lifecycle state, from GitLab's `state` field. */

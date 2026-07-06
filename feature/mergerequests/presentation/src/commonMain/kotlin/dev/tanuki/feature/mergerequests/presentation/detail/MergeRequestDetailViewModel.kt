@@ -7,8 +7,11 @@ import dev.tanuki.core.domain.util.onFailure
 import dev.tanuki.core.domain.util.onSuccess
 import dev.tanuki.core.presentation.UiText
 import dev.tanuki.feature.mergerequests.domain.MergeRequestRepository
+import dev.tanuki.feature.mergerequests.domain.MergeRequestState
+import dev.tanuki.feature.mergerequests.domain.MergeStatus
 import dev.tanuki.feature.mergerequests.domain.NewDiffComment
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -43,6 +46,7 @@ class MergeRequestDetailViewModel(
             }
             MergeRequestDetailAction.OnApprove -> approve()
             MergeRequestDetailAction.OnMerge -> merge()
+            is MergeRequestDetailAction.OnRebase -> rebase(action.skipCi)
             is MergeRequestDetailAction.OnCommentChange ->
                 _state.update { it.copy(commentText = action.value) }
             MergeRequestDetailAction.OnSendComment -> sendComment()
@@ -194,6 +198,41 @@ class MergeRequestDetailViewModel(
         }
     }
 
+    private fun rebase(skipCi: Boolean) {
+        if (_state.value.actionInProgress) return
+        _state.update { it.copy(isRebasing = true) }
+        viewModelScope.launch {
+            repository.rebase(projectId, iid, skipCi)
+                .onSuccess {
+                    _events.send(MergeRequestDetailEvent.ShowMessage("Rebasing…"))
+                    // GitLab rebases asynchronously — poll the MR until it finishes (or we give up).
+                    var latest = _state.value.mergeRequest
+                    var attempts = 0
+                    while (attempts < 15) {
+                        delay(2000)
+                        repository.getMergeRequest(projectId, iid).onSuccess { fresh ->
+                            latest = fresh
+                            _state.update { s -> s.copy(mergeRequest = fresh) }
+                        }
+                        if (latest?.rebaseInProgress != true) break
+                        attempts++
+                    }
+                    _state.update { it.copy(isRebasing = false) }
+                    val err = latest?.mergeError
+                    _events.send(
+                        MergeRequestDetailEvent.ShowMessage(
+                            if (err.isNullOrBlank()) "Rebased" else "Rebase failed: $err",
+                        ),
+                    )
+                    reload()
+                }
+                .onFailure {
+                    _state.update { it.copy(isRebasing = false) }
+                    _events.send(MergeRequestDetailEvent.ShowMessage("Couldn't start rebase"))
+                }
+        }
+    }
+
     private fun sendComment() {
         val body = _state.value.commentText.trim()
         if (body.isEmpty() || _state.value.actionInProgress) return
@@ -235,6 +274,16 @@ class MergeRequestDetailViewModel(
                 .onSuccess { list -> _state.update { it.copy(pipelines = list) } }
             repository.getApprovals(projectId, iid)
                 .onSuccess { info -> _state.update { it.copy(approvals = info) } }
+
+            // GitLab computes merge status asynchronously — an open MR often returns "checking"
+            // on the first fetch. Re-fetch once shortly so the widget resolves to a real
+            // status (and its Merge/Rebase button) without the user re-opening the screen.
+            val mr = _state.value.mergeRequest
+            if (mr != null && mr.state == MergeRequestState.OPEN && mr.status == MergeStatus.UNKNOWN) {
+                delay(2500)
+                repository.getMergeRequest(projectId, iid)
+                    .onSuccess { fresh -> _state.update { it.copy(mergeRequest = fresh) } }
+            }
         }
     }
 
