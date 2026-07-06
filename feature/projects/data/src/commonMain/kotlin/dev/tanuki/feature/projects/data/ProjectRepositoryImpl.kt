@@ -64,17 +64,24 @@ class ProjectRepositoryImpl(
         safeCall<List<ProjectDto>> {
             httpClient.get("projects") {
                 when (filter) {
-                    ProjectFilter.ALL, ProjectFilter.SHARED -> parameter("membership", true)
+                    ProjectFilter.RECENT, ProjectFilter.MEMBER -> parameter("membership", true)
                     ProjectFilter.STARRED -> parameter("starred", true)
                     ProjectFilter.PERSONAL -> parameter("owned", true)
                 }
-                parameter("order_by", "last_activity_at")
-                parameter("per_page", 30)
+                // Recent = most-recently-active first; the others read better alphabetically.
+                if (filter == ProjectFilter.RECENT) {
+                    parameter("order_by", "last_activity_at")
+                    parameter("sort", "desc")
+                } else {
+                    parameter("order_by", "name")
+                    parameter("sort", "asc")
+                }
+                parameter("per_page", 50)
             }
         }.map { dtos ->
             dtos.map { it.toProject() }
-                // "Shared" = projects you're a member of that live under a group (not your own).
-                .filter { filter != ProjectFilter.SHARED || it.namespaceKind == "group" }
+                // Personal = repos in your own (user) namespace.
+                .filter { filter != ProjectFilter.PERSONAL || it.namespaceKind == "user" }
         }
 
     override suspend fun searchProjects(query: String): Result<List<Project>, DataError.Remote> =
