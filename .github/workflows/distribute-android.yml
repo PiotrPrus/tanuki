@@ -58,25 +58,20 @@ jobs:
         run: |
           set -euo pipefail
           OUT="$RUNNER_TEMP/firebase-sa.json"
-          # Try the base64 secret first; if it decodes to nothing (bad base64), fall back to raw JSON.
+          TRY="$RUNNER_TEMP/sa-try.json"
+          : > "$OUT"
+          # Accept whichever secret is a real service-account key (contains "private_key").
+          # Prefer the base64 secret, but a stale/wrong one won't block the raw JSON secret.
           if [ -n "${SA_B64:-}" ]; then
-            echo "$SA_B64" | base64 --decode > "$OUT" 2>/dev/null || true
+            echo "$SA_B64" | base64 --decode > "$TRY" 2>/dev/null || true
+            grep -q '"private_key"' "$TRY" 2>/dev/null && cp "$TRY" "$OUT" || true
           fi
           if [ ! -s "$OUT" ] && [ -n "${SA_RAW:-}" ]; then
-            printf '%s' "$SA_RAW" > "$OUT"
+            printf '%s' "$SA_RAW" > "$TRY"
+            grep -q '"private_key"' "$TRY" 2>/dev/null && cp "$TRY" "$OUT" || true
           fi
           if [ ! -s "$OUT" ]; then
-            echo "::error::Firebase service account is empty — set FIREBASE_SERVICE_ACCOUNT_ANDROID_B64 (base64 of the JSON key) or FIREBASE_SERVICE_ACCOUNT_ANDROID (raw JSON)."
-            exit 1
-          fi
-          # Must be a JSON key (starts with '{'), otherwise the base64 was of the wrong file.
-          case "$(head -c1 "$OUT")" in
-            '{') : ;;
-            *) echo "::error::Service account file is not JSON — check the secret contents (wrong file or bad base64)."; exit 1 ;;
-          esac
-          # A real service-account key has type=service_account + a private_key. google-services.json does not.
-          if ! grep -q '"private_key"' "$OUT"; then
-            echo "::error::This isn't a service-account key (no private_key, $(wc -c < "$OUT") bytes) — it looks like google-services.json. Create a key in Google Cloud Console → IAM & Admin → Service Accounts → Keys → Add key (JSON), grant it the 'Firebase App Distribution Admin' role, and put that JSON (or its base64) in the FIREBASE_SERVICE_ACCOUNT_ANDROID(_B64) secret."
+            echo "::error::No valid service-account key in FIREBASE_SERVICE_ACCOUNT_ANDROID_B64 / FIREBASE_SERVICE_ACCOUNT_ANDROID (must be JSON containing \"private_key\" — not google-services.json). Generate one in Firebase Console → Project settings → Service accounts → Generate new private key."
             exit 1
           fi
           echo "FIREBASE_SERVICE_ACCOUNT_FILE=$OUT" >> "$GITHUB_ENV"
