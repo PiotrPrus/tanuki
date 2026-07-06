@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "372563343342",
+    "project_id": "tanuki-32c54",
+    "storage_bucket": "tanuki-32c54.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:372563343342:android:41f25a2f67a7fdcf8f40ff",
+        "android_client_info": {
+          "package_name": "dev.tanuki"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBfIVDzIPNF0rigXyhJATyjB1ay4KxjQ5s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
