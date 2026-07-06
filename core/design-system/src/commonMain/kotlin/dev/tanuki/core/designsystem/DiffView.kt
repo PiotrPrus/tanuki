@@ -8,7 +8,6 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.tanuki.core.domain.diff.DiffLine
@@ -125,15 +125,11 @@ fun FileDiffView(
             // backgrounds span the container) but grows for long lines so nothing wraps.
             BoxWithConstraints(Modifier.fillMaxWidth()) {
                 val minRowWidth = maxWidth
-                Column(
-                    Modifier
-                        .horizontalScroll(rememberScrollState())
-                        .width(IntrinsicSize.Max)
-                        .widthIn(min = minRowWidth),
-                ) {
+                Column(Modifier.horizontalScroll(rememberScrollState())) {
                     file.lines.forEach { line ->
                         DiffLineRow(
                             line = line,
+                            minWidth = minRowWidth,
                             selected = isLineSelected(line),
                             hasComment = lineHasComment(line),
                             onClick = onLineClick?.let { cb -> { cb(line) } },
@@ -150,6 +146,7 @@ fun FileDiffView(
 @Composable
 private fun DiffLineRow(
     line: DiffLine,
+    minWidth: Dp,
     selected: Boolean = false,
     hasComment: Boolean = false,
     onClick: (() -> Unit)? = null,
@@ -164,7 +161,7 @@ private fun DiffLineRow(
             softWrap = false,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
-                .fillMaxWidth()
+                .widthIn(min = minWidth)
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .padding(start = 10.dp, end = 12.dp, top = 2.dp, bottom = 2.dp),
         )
@@ -189,7 +186,7 @@ private fun DiffLineRow(
     val interactive = onClick != null || onLongClick != null
     Row(
         modifier = Modifier
-            .fillMaxWidth()
+            .widthIn(min = minWidth)
             .then(
                 if (interactive) {
                     Modifier.combinedClickable(
