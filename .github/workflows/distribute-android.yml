@@ -74,6 +74,11 @@ jobs:
             '{') : ;;
             *) echo "::error::Service account file is not JSON — check the secret contents (wrong file or bad base64)."; exit 1 ;;
           esac
+          # A real service-account key has type=service_account + a private_key. google-services.json does not.
+          if ! grep -q '"private_key"' "$OUT"; then
+            echo "::error::This isn't a service-account key (no private_key, $(wc -c < "$OUT") bytes) — it looks like google-services.json. Create a key in Google Cloud Console → IAM & Admin → Service Accounts → Keys → Add key (JSON), grant it the 'Firebase App Distribution Admin' role, and put that JSON (or its base64) in the FIREBASE_SERVICE_ACCOUNT_ANDROID(_B64) secret."
+            exit 1
+          fi
           echo "FIREBASE_SERVICE_ACCOUNT_FILE=$OUT" >> "$GITHUB_ENV"
           echo "Service account OK ($(wc -c < "$OUT") bytes)."
 
@@ -88,7 +93,11 @@ jobs:
         run: |
           ./gradlew :composeApp:assembleRelease :composeApp:appDistributionUploadRelease \
             -Ptanuki.versionName=${{ steps.version.outputs.name }} \
-            -Ptanuki.versionCode=${{ github.run_number }}
+            -Ptanuki.versionCode=${{ github.run_number }} \
+            -PfirebaseAppId="$FIREBASE_APP_ID" \
+            -PfirebaseServiceCredentialsFile="$FIREBASE_SERVICE_ACCOUNT_FILE" \
+            -PfirebaseTesterGroups="$FIREBASE_TESTER_GROUPS" \
+            -PfirebaseReleaseNotes="$FIREBASE_RELEASE_NOTES"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

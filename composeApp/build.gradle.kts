@@ -98,11 +98,14 @@ android {
 // Firebase App Distribution — configured entirely from env vars so nothing secret is
 // committed. Only the `appDistributionUploadRelease` task reads these; normal builds ignore them.
 firebaseAppDistribution {
-    appId = System.getenv("FIREBASE_APP_ID") ?: ""
-    serviceCredentialsFile = System.getenv("FIREBASE_SERVICE_ACCOUNT_FILE") ?: ""
-    groups = System.getenv("FIREBASE_TESTER_GROUPS") ?: "internal-testers"
+    // Read from -P properties (reliable through the Gradle daemon), falling back to env vars.
+    fun cfg(prop: String, env: String) =
+        (findProperty(prop) as String?)?.takeIf { it.isNotBlank() } ?: System.getenv(env)
+    appId = cfg("firebaseAppId", "FIREBASE_APP_ID") ?: ""
+    serviceCredentialsFile = cfg("firebaseServiceCredentialsFile", "FIREBASE_SERVICE_ACCOUNT_FILE") ?: ""
+    groups = cfg("firebaseTesterGroups", "FIREBASE_TESTER_GROUPS") ?: "internal-testers"
     artifactType = "APK"
-    releaseNotes = System.getenv("FIREBASE_RELEASE_NOTES") ?: "Internal test build"
+    releaseNotes = cfg("firebaseReleaseNotes", "FIREBASE_RELEASE_NOTES") ?: "Internal test build"
 }
 
 dependencies {
