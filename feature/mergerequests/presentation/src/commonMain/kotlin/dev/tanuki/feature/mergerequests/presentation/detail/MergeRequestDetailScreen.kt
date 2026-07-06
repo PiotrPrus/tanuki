@@ -1,6 +1,7 @@
 package dev.tanuki.feature.mergerequests.presentation.detail
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -656,50 +658,136 @@ private fun DiscussionRow(discussion: Discussion, onClick: () -> Unit) {
 
 @Composable
 private fun Header(mr: MergeRequest, additions: Int, deletions: Int, fileCount: Int) {
+    val now = remember { Clock.System.now() }
+    val cardShape = RoundedCornerShape(12.dp)
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
-        Text(
-            text = mr.title,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-        )
-        Row(
-            modifier = Modifier.padding(top = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(cardShape)
+                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, cardShape)
+                .padding(16.dp),
         ) {
-            StatusPill(mr.status)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                StateBadge(mr)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    text = "!${mr.iid} · Updated ${relativeTime(mr.updatedAt, now)}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Text(
-                text = "${mr.reference} · ${mr.authorName}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = mr.title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 12.dp),
             )
+            Row(
+                modifier = Modifier.padding(top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                BranchChip(mr.sourceBranch, Modifier.weight(1f, fill = false))
+                Text("→", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                BranchChip(mr.targetBranch, Modifier.weight(1f, fill = false))
+            }
+            HorizontalDivider(
+                modifier = Modifier.padding(top = 14.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+            )
+            Row(
+                modifier = Modifier.padding(top = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                InitialsAvatar(mr.authorName)
+                Column {
+                    Text(mr.authorName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                    Text("Author", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
+
+        Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatTile("+$additions", "Additions", TanukiTheme.colors.diffAddedAccent)
+            StatTile("−$deletions", "Deletions", TanukiTheme.colors.diffRemovedAccent)
+            StatTile("$fileCount", "Files", MaterialTheme.colorScheme.onSurface)
+        }
+    }
+}
+
+@Composable
+private fun StateBadge(mr: MergeRequest) {
+    val (label, color) = when {
+        mr.isDraft -> "DRAFT" to MaterialTheme.colorScheme.outline
+        mr.state == dev.tanuki.feature.mergerequests.domain.MergeRequestState.MERGED -> "MERGED" to MaterialTheme.colorScheme.secondary
+        mr.state == dev.tanuki.feature.mergerequests.domain.MergeRequestState.CLOSED -> "CLOSED" to MaterialTheme.colorScheme.error
+        else -> "OPEN" to TanukiTheme.colors.success
+    }
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(percent = 50))
+            .background(color.copy(alpha = 0.16f))
+            .padding(horizontal = 10.dp, vertical = 3.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = color)
+    }
+}
+
+@Composable
+private fun BranchChip(name: String, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+            .padding(horizontal = 8.dp, vertical = 5.dp),
+    ) {
         Text(
-            text = "${mr.sourceBranch} → ${mr.targetBranch}",
-            style = MaterialTheme.typography.bodySmall,
+            text = name,
+            style = MaterialTheme.typography.labelMedium,
             fontFamily = CodeFontFamily,
-            color = MaterialTheme.colorScheme.secondary,
-            modifier = Modifier.padding(top = 10.dp),
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
-        Row(modifier = Modifier.padding(top = 10.dp)) {
-            Text(
-                text = "+$additions",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = TanukiTheme.colors.diffAddedAccent,
-            )
-            Text(
-                text = " −$deletions",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = TanukiTheme.colors.diffRemovedAccent,
-            )
-            Text(
-                text = " · $fileCount " + if (fileCount == 1) "file" else "files",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+    }
+}
+
+@Composable
+private fun InitialsAvatar(name: String) {
+    val initials = name.trim().split(" ", limit = 2).mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("").take(2)
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.18f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = initials.ifEmpty { "?" },
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.tertiary,
+        )
+    }
+}
+
+@Composable
+private fun RowScope.StatTile(value: String, label: String, valueColor: androidx.compose.ui.graphics.Color) {
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+            .padding(vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = valueColor)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
     }
 }
 
