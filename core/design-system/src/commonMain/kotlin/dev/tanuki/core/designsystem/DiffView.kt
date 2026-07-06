@@ -2,8 +2,10 @@ package dev.tanuki.core.designsystem
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,10 +16,13 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.tanuki.core.domain.diff.DiffLine
@@ -57,13 +63,19 @@ fun FileDiffView(
     val path = if (file.isDeleted) file.oldPath else file.newPath
     val name = path.substringAfterLast('/')
     val dir = path.substringBeforeLast('/', missingDelimiterValue = "")
+    val shape = RoundedCornerShape(8.dp)
 
-    Column(modifier.fillMaxWidth().padding(top = 16.dp)) {
+    // One inset, bordered container per file: header + (scrollable) diff body.
+    Column(
+        modifier
+            .fillMaxWidth()
+            .padding(start = 8.dp, end = 8.dp, top = 12.dp)
+            .clip(shape)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape),
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp)
-                .clip(RoundedCornerShape(8.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .clickable { expanded = !expanded }
                 .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -108,14 +120,23 @@ fun FileDiffView(
             )
         }
         if (expanded) {
-            file.lines.forEach { line ->
-                DiffLineRow(
-                    line = line,
-                    selected = isLineSelected(line),
-                    hasComment = lineHasComment(line),
-                    onClick = onLineClick?.let { cb -> { cb(line) } },
-                    onLongClick = onLineLongPress?.let { cb -> { cb(line) } },
-                )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            // Body scrolls horizontally; each row fills at least the viewport width (so line
+            // backgrounds span the container) but grows for long lines so nothing wraps.
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val minRowWidth = maxWidth
+                Column(Modifier.horizontalScroll(rememberScrollState())) {
+                    file.lines.forEach { line ->
+                        DiffLineRow(
+                            line = line,
+                            minWidth = minRowWidth,
+                            selected = isLineSelected(line),
+                            hasComment = lineHasComment(line),
+                            onClick = onLineClick?.let { cb -> { cb(line) } },
+                            onLongClick = onLineLongPress?.let { cb -> { cb(line) } },
+                        )
+                    }
+                }
             }
         }
     }
@@ -125,6 +146,7 @@ fun FileDiffView(
 @Composable
 private fun DiffLineRow(
     line: DiffLine,
+    minWidth: Dp,
     selected: Boolean = false,
     hasComment: Boolean = false,
     onClick: (() -> Unit)? = null,
@@ -136,11 +158,12 @@ private fun DiffLineRow(
             text = line.content,
             fontFamily = CodeFontFamily,
             fontSize = 12.sp,
+            softWrap = false,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
-                .fillMaxWidth()
+                .widthIn(min = minWidth)
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .padding(horizontal = 12.dp, vertical = 2.dp),
+                .padding(start = 10.dp, end = 12.dp, top = 2.dp, bottom = 2.dp),
         )
         return
     }
@@ -163,7 +186,7 @@ private fun DiffLineRow(
     val interactive = onClick != null || onLongClick != null
     Row(
         modifier = Modifier
-            .fillMaxWidth()
+            .widthIn(min = minWidth)
             .then(
                 if (interactive) {
                     Modifier.combinedClickable(
@@ -175,33 +198,32 @@ private fun DiffLineRow(
                 },
             )
             .background(background)
-            .padding(horizontal = 8.dp, vertical = 1.dp),
+            .padding(vertical = 1.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // Left gutter accent marks lines that have a comment thread (visible at scroll origin).
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .height(16.dp)
+                .background(if (hasComment) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent),
+        )
         Text(
             text = sign,
             fontFamily = CodeFontFamily,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             color = signColor,
-            modifier = Modifier.width(14.dp),
+            modifier = Modifier.padding(start = 6.dp).width(12.dp),
         )
         Text(
             text = line.content,
             fontFamily = CodeFontFamily,
             fontSize = 12.sp,
+            softWrap = false,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.padding(end = 12.dp),
         )
-        if (hasComment) {
-            Box(
-                modifier = Modifier
-                    .padding(start = 6.dp)
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
-            )
-        }
     }
 }
 
