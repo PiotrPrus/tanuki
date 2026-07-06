@@ -21,6 +21,11 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
@@ -63,6 +68,7 @@ import dev.tanuki.core.designsystem.DiffScrollbar
 import dev.tanuki.core.designsystem.FileDiffView
 import dev.tanuki.core.designsystem.TanukiTheme
 import dev.tanuki.core.domain.diff.DiffLine
+import dev.tanuki.core.domain.diff.DiffLineType
 import dev.tanuki.core.presentation.ObserveAsEvents
 import dev.tanuki.feature.mergerequests.domain.ApprovalInfo
 import dev.tanuki.feature.mergerequests.domain.Discussion
@@ -532,6 +538,8 @@ private fun ThreadSheet(
     onAction: (MergeRequestDetailAction) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val now = remember { Clock.System.now() }
+    val notes = thread.notes.filter { !it.system }
     ModalBottomSheet(
         onDismissRequest = { onAction(MergeRequestDetailAction.OnCloseThread) },
         sheetState = sheetState,
@@ -539,26 +547,35 @@ private fun ThreadSheet(
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp).imePadding(),
         ) {
-            if (thread.isOnDiff) {
-                Text(
-                    text = "${thread.filePath?.substringAfterLast('/')} · line ${thread.newLine ?: thread.oldLine}",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontFamily = CodeFontFamily,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            // Header: title + file:line + resolved/unresolved chip
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Conversation", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                if (thread.resolvable) {
-                    Text(
-                        text = if (thread.resolved) "Resolved" else "Unresolved",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (thread.resolved) TanukiTheme.colors.success else MaterialTheme.colorScheme.error,
-                    )
+                Column(Modifier.weight(1f)) {
+                    Text("Conversation", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    if (thread.isOnDiff) {
+                        Text(
+                            text = "${thread.filePath?.substringAfterLast('/')} · line ${thread.newLine ?: thread.oldLine}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = CodeFontFamily,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
+                if (thread.resolvable) ResolvedChip(thread.resolved)
             }
 
-            thread.notes.filter { !it.system }.forEach { note -> NoteItem(note) }
+            // Scrollable region: code context + threaded messages (reply/resolve stay pinned below).
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 460.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(top = 12.dp),
+            ) {
+                codeWindow(state, thread)?.let { window ->
+                    CodeContext(window)
+                    Spacer(Modifier.height(14.dp))
+                }
+                notes.forEachIndexed { i, note -> MessageItem(note, now, isReply = i > 0) }
+            }
 
             OutlinedTextField(
                 value = state.threadReplyText,
@@ -588,22 +605,119 @@ private fun ThreadSheet(
     }
 }
 
+/** A single message in a conversation: avatar, author, relative time, body. Replies are indented. */
 @Composable
-private fun NoteItem(note: DiscussionNote) {
-    val now = remember { Clock.System.now() }
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(note.authorName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-            Text(
-                relativeTime(note.createdAt, now),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+private fun MessageItem(note: DiscussionNote, now: Instant, isReply: Boolean) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 10.dp, start = if (isReply) 24.dp else 0.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        InitialsAvatar(note.authorName, size = if (isReply) 28 else 32)
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(note.authorName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(relativeTime(note.createdAt, now), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            // Render as Markdown — CodeRabbit uses blockquotes/bold/lists, and plain human
+            // comments render fine through the same formatter.
+            Markdown(
+                content = note.body,
+                imageTransformer = Coil3ImageTransformerImpl,
+                typography = markdownTypography(
+                    h1 = MaterialTheme.typography.titleMedium,
+                    h2 = MaterialTheme.typography.titleSmall,
+                    h3 = MaterialTheme.typography.bodyLarge,
+                    h4 = MaterialTheme.typography.bodyMedium,
+                    h5 = MaterialTheme.typography.bodyMedium,
+                    h6 = MaterialTheme.typography.bodyMedium,
+                    text = MaterialTheme.typography.bodyMedium,
+                    paragraph = MaterialTheme.typography.bodyMedium,
+                ),
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
             )
         }
+    }
+}
+
+/** A small pill showing whether the thread is resolved. */
+@Composable
+private fun ResolvedChip(resolved: Boolean) {
+    val (label, color) = if (resolved) "Resolved" to TanukiTheme.colors.success else "Unresolved" to MaterialTheme.colorScheme.error
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(percent = 50))
+            .background(color.copy(alpha = 0.16f))
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium, color = color)
+    }
+}
+
+/** The commented line plus a few lines of context, extracted from the loaded diffs. */
+private data class CodeWindow(val fileName: String, val lines: List<DiffLine>, val activeIndex: Int)
+
+private fun codeWindow(state: MergeRequestDetailState, thread: Discussion): CodeWindow? {
+    val path = thread.filePath ?: return null
+    val diff = state.diffs.firstOrNull { it.newPath == path || it.oldPath == path } ?: return null
+    val idx = diff.lines.indexOfFirst { line ->
+        (thread.newLine != null && line.newLine == thread.newLine) ||
+            (thread.oldLine != null && line.oldLine == thread.oldLine)
+    }
+    if (idx < 0) return null
+    val from = (idx - 3).coerceAtLeast(0)
+    val to = (idx + 3).coerceAtMost(diff.lines.lastIndex)
+    return CodeWindow(path.substringAfterLast('/'), diff.lines.subList(from, to + 1), idx - from)
+}
+
+@Composable
+private fun CodeContext(window: CodeWindow) {
+    val shape = RoundedCornerShape(8.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape),
+    ) {
         Text(
-            text = note.body,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(top = 2.dp),
+            text = window.fileName,
+            style = MaterialTheme.typography.labelSmall,
+            fontFamily = CodeFontFamily,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+        )
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        Column(Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 4.dp)) {
+            window.lines.forEachIndexed { i, line -> CodeLineRow(line, active = i == window.activeIndex) }
+        }
+    }
+}
+
+@Composable
+private fun CodeLineRow(line: DiffLine, active: Boolean) {
+    val bg = when {
+        active -> MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+        line.type == DiffLineType.ADDITION -> TanukiTheme.colors.diffAddedBackground
+        line.type == DiffLineType.DELETION -> TanukiTheme.colors.diffRemovedBackground
+        else -> androidx.compose.ui.graphics.Color.Transparent
+    }
+    Row(modifier = Modifier.background(bg).padding(vertical = 1.dp)) {
+        Text(
+            text = (line.newLine ?: line.oldLine)?.toString().orEmpty(),
+            style = MaterialTheme.typography.labelSmall,
+            fontFamily = CodeFontFamily,
+            color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+            textAlign = TextAlign.End,
+            modifier = Modifier.width(44.dp).padding(start = 8.dp, end = 10.dp),
+        )
+        Text(
+            text = line.content,
+            style = MaterialTheme.typography.labelSmall,
+            fontFamily = CodeFontFamily,
+            softWrap = false,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(end = 12.dp),
         )
     }
 }
@@ -618,9 +732,21 @@ private fun ActivityHeader() {
     )
 }
 
+/** A clean one-line preview of a (possibly Markdown) comment body for the activity row. */
+private fun commentPreview(body: String): String =
+    body.lineSequence()
+        .map { it.trim() }
+        .firstOrNull { it.isNotEmpty() && !it.startsWith("<!--") && !it.startsWith("<") }
+        ?.trimStart('>', '#', '*', '-', ' ')
+        ?.replace(Regex("[*_`]"), "")
+        ?.take(140)
+        .orEmpty()
+
 @Composable
 private fun DiscussionRow(discussion: Discussion, onClick: () -> Unit) {
+    val now = remember { Clock.System.now() }
     val first = discussion.notes.firstOrNull { !it.system }
+    val replyCount = discussion.notes.count { !it.system }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -631,36 +757,54 @@ private fun DiscussionRow(discussion: Discussion, onClick: () -> Unit) {
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        InitialsAvatar(first?.authorName ?: "?", size = 32)
         Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(first?.authorName ?: "Thread", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                if (discussion.isOnDiff) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = first?.authorName ?: "Thread",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                first?.let {
                     Text(
-                        text = "${discussion.filePath?.substringAfterLast('/')}:${discussion.newLine ?: discussion.oldLine}",
+                        "· ${relativeTime(it.createdAt, now)}",
                         style = MaterialTheme.typography.labelSmall,
-                        fontFamily = CodeFontFamily,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
             Text(
-                text = first?.body?.replace("\n", " ") ?: "",
-                style = MaterialTheme.typography.bodySmall,
+                text = if (discussion.isOnDiff) {
+                    "commented on ${discussion.filePath?.substringAfterLast('/')}:${discussion.newLine ?: discussion.oldLine}"
+                } else {
+                    "commented"
+                },
+                style = MaterialTheme.typography.labelSmall,
+                fontFamily = CodeFontFamily,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = commentPreview(first?.body.orEmpty()),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 2.dp),
+                modifier = Modifier.padding(top = 4.dp),
             )
         }
-        if (discussion.notes.count { !it.system } > 1) {
-            Text(
-                "${discussion.notes.count { !it.system }}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        if (discussion.resolvable && discussion.resolved) {
-            Text("✓", color = TanukiTheme.colors.success)
+        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (discussion.resolvable) ResolvedChip(discussion.resolved)
+            if (replyCount > 1) {
+                Text(
+                    "$replyCount replies",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
