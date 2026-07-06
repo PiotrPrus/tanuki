@@ -56,13 +56,26 @@ jobs:
           SA_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ANDROID_B64 }}
           SA_RAW: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ANDROID }}
         run: |
-          # Prefer the base64 secret (avoids JSON newline/escaping issues); fall back to raw JSON.
-          if [ -n "$SA_B64" ]; then
-            echo "$SA_B64" | base64 --decode > "$RUNNER_TEMP/firebase-sa.json"
-          else
-            printf '%s' "$SA_RAW" > "$RUNNER_TEMP/firebase-sa.json"
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/firebase-sa.json"
+          # Try the base64 secret first; if it decodes to nothing (bad base64), fall back to raw JSON.
+          if [ -n "${SA_B64:-}" ]; then
+            echo "$SA_B64" | base64 --decode > "$OUT" 2>/dev/null || true
           fi
-          echo "FIREBASE_SERVICE_ACCOUNT_FILE=$RUNNER_TEMP/firebase-sa.json" >> "$GITHUB_ENV"
+          if [ ! -s "$OUT" ] && [ -n "${SA_RAW:-}" ]; then
+            printf '%s' "$SA_RAW" > "$OUT"
+          fi
+          if [ ! -s "$OUT" ]; then
+            echo "::error::Firebase service account is empty — set FIREBASE_SERVICE_ACCOUNT_ANDROID_B64 (base64 of the JSON key) or FIREBASE_SERVICE_ACCOUNT_ANDROID (raw JSON)."
+            exit 1
+          fi
+          # Must be a JSON key (starts with '{'), otherwise the base64 was of the wrong file.
+          case "$(head -c1 "$OUT")" in
+            '{') : ;;
+            *) echo "::error::Service account file is not JSON — check the secret contents (wrong file or bad base64)."; exit 1 ;;
+          esac
+          echo "FIREBASE_SERVICE_ACCOUNT_FILE=$OUT" >> "$GITHUB_ENV"
+          echo "Service account OK ($(wc -c < "$OUT") bytes)."
 
       - name: Build & distribute
         env:
