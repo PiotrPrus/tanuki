@@ -9,14 +9,17 @@ import dev.tanuki.core.domain.util.DataError
 import dev.tanuki.core.domain.util.EmptyResult
 import dev.tanuki.core.domain.util.Result
 import dev.tanuki.core.domain.util.map
+import dev.tanuki.feature.mergerequests.data.dto.ApprovalsDto
 import dev.tanuki.feature.mergerequests.data.dto.DiscussionDto
 import dev.tanuki.feature.mergerequests.data.dto.MergeRequestDto
 import dev.tanuki.feature.mergerequests.data.dto.MrCommitDto
 import dev.tanuki.feature.mergerequests.data.dto.MrPipelineDto
+import dev.tanuki.feature.mergerequests.data.dto.toApprovalInfo
 import dev.tanuki.feature.mergerequests.data.dto.toDiscussion
 import dev.tanuki.feature.mergerequests.data.dto.toMrCommit
 import dev.tanuki.feature.mergerequests.data.dto.toMrPipeline
 import dev.tanuki.feature.mergerequests.data.mapper.toMergeRequest
+import dev.tanuki.feature.mergerequests.domain.ApprovalInfo
 import dev.tanuki.feature.mergerequests.domain.Discussion
 import dev.tanuki.feature.mergerequests.domain.MergeRequest
 import dev.tanuki.feature.mergerequests.domain.MergeRequestFilter
@@ -159,6 +162,14 @@ class MergeRequestRepositoryImpl(
         safeCall<List<MrPipelineDto>> {
             httpClient.get("projects/$projectId/merge_requests/$iid/pipelines") { parameter("per_page", 20) }
         }.map { dtos -> dtos.map { it.toMrPipeline() } }
+
+    override suspend fun getApprovals(
+        projectId: Long,
+        iid: Long,
+    ): Result<ApprovalInfo, DataError.Remote> =
+        safeCall<ApprovalsDto> {
+            httpClient.get("projects/$projectId/merge_requests/$iid/approvals")
+        }.map { it.toApprovalInfo() }
 
     private suspend fun fetch(scope: String): Result<List<MergeRequest>, DataError.Remote> =
         safeCall<List<MergeRequestDto>> {

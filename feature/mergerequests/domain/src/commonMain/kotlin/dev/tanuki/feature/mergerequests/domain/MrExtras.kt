@@ -16,3 +16,16 @@ data class MrPipeline(
     val webUrl: String?,
     val createdAt: Instant,
 )
+
+data class MrUser(
+    val name: String,
+    val avatarUrl: String?,
+)
+
+/** MR approval state: who approved and how many approvals remain. */
+data class ApprovalInfo(
+    val approved: Boolean,
+    val approvalsRequired: Int,
+    val approvalsLeft: Int,
+    val approvedBy: List<MrUser>,
+)

@@ -54,4 +54,7 @@ interface MergeRequestRepository {
 
     /** Pipelines run for the MR, newest first. */
     suspend fun getPipelines(projectId: Long, iid: Long): Result<List<MrPipeline>, DataError.Remote>
+
+    /** Approval state for the MR (who approved, how many left). */
+    suspend fun getApprovals(projectId: Long, iid: Long): Result<ApprovalInfo, DataError.Remote>
 }

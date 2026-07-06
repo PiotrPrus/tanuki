@@ -5,6 +5,7 @@ import dev.tanuki.feature.mergerequests.domain.DiffRefs
 import dev.tanuki.feature.mergerequests.domain.MergeRequest
 import dev.tanuki.feature.mergerequests.domain.MergeRequestState
 import dev.tanuki.feature.mergerequests.domain.MergeStatus
+import dev.tanuki.feature.mergerequests.domain.MrUser
 import kotlin.time.Instant
 
 fun MergeRequestDto.toMergeRequest(): MergeRequest = MergeRequest(
@@ -38,6 +39,7 @@ fun MergeRequestDto.toMergeRequest(): MergeRequest = MergeRequest(
             null
         }
     },
+    reviewers = reviewers.map { MrUser(name = it.name, avatarUrl = it.avatarUrl) },
 )
 
 private fun String?.toMergeStatus(isDraft: Boolean, hasConflicts: Boolean): MergeStatus = when {
